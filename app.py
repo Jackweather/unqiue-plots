@@ -114,9 +114,7 @@ def serve_plot(date_str: str, filename: str):
 def run_task1():
     scripts = [
         resolve_script_path(
-            "/opt/render/project/src/hrrr_dc_temp_grid.py",
-            "hrrr_dc_temp_grid.py",
-        ),
+            "/opt/render/project/src/hrrr_dc_temp_grid.py","hrrr_dc_temp_grid.py"),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, 1), daemon=True).start()
     return f"Task started in background! Check {LOG_DIR} for output.", 200
