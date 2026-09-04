@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -42,7 +42,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--date",
-        default=datetime.now(UTC).strftime(DEFAULT_DATE_FORMAT),
+        default=datetime.now(timezone.utc).strftime(DEFAULT_DATE_FORMAT),
         help="UTC date to query in YYYYMMDD format. Defaults to today in UTC.",
     )
     parser.add_argument(
@@ -150,7 +150,7 @@ def try_fetch_record(
     date_str: str,
     grib_file: Path,
 ) -> list[RunRecord]:
-    run_time = datetime.strptime(f"{date_str}{cycle_hour:02d}", "%Y%m%d%H").replace(tzinfo=UTC)
+    run_time = datetime.strptime(f"{date_str}{cycle_hour:02d}", "%Y%m%d%H").replace(tzinfo=timezone.utc)
     records: list[RunRecord] = []
     with xr.open_dataset(
         grib_file,
@@ -159,7 +159,7 @@ def try_fetch_record(
     ) as ds:
         for location_key, location in LOCATIONS.items():
             valid_time, temp_c = extract_temperature(ds, location["lat"], location["lon"])
-            valid_time = valid_time.replace(tzinfo=UTC) if valid_time.tzinfo is None else valid_time.astimezone(UTC)
+            valid_time = valid_time.replace(tzinfo=timezone.utc) if valid_time.tzinfo is None else valid_time.astimezone(timezone.utc)
             temp_f = (temp_c * 9 / 5) + 32
             records.append(
                 RunRecord(
@@ -177,8 +177,8 @@ def try_fetch_record(
 
 
 def collect_records(date_str: str, max_forecast_hour: int, timeout: int, raw_dir: Path) -> list[RunRecord]:
-    target_date = datetime.strptime(date_str, DEFAULT_DATE_FORMAT).replace(tzinfo=UTC)
-    now_utc = datetime.now(UTC)
+    target_date = datetime.strptime(date_str, DEFAULT_DATE_FORMAT).replace(tzinfo=timezone.utc)
+    now_utc = datetime.now(timezone.utc)
     latest_cycle = 23 if target_date.date() < now_utc.date() else now_utc.hour
     session = requests.Session()
     session.headers.update({"User-Agent": "hrrr-dc-temp-grid/1.0"})
