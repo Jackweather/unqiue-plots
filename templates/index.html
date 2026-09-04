@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HRRR Plot Viewer</title>
+    <style>
+        :root {
+            --bg: #eef3ef;
+            --panel: #fbf8f3;
+            --ink: #1f2a2e;
+            --muted: #5f6a6d;
+            --line: #d1d9d3;
+            --accent: #0d6b5f;
+            --accent-soft: #d8ece6;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Georgia, "Times New Roman", serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, #ffffff 0, #ffffff80 22%, transparent 45%),
+                linear-gradient(135deg, #dbe7e0 0%, var(--bg) 48%, #f6ede0 100%);
+            min-height: 100vh;
+        }
+
+        .shell {
+            width: min(1200px, calc(100% - 32px));
+            margin: 24px auto;
+        }
+
+        .hero {
+            background: color-mix(in srgb, var(--panel) 92%, white 8%);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(31, 42, 46, 0.08);
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: clamp(2rem, 4vw, 3.3rem);
+            line-height: 1;
+        }
+
+        p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 1rem;
+        }
+
+        .toolbar {
+            margin-top: 18px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        label {
+            font-weight: 700;
+        }
+
+        select,
+        button {
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            padding: 10px 14px;
+            font: inherit;
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .grid {
+            margin-top: 22px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: rgba(251, 248, 243, 0.92);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 18px 36px rgba(31, 42, 46, 0.07);
+        }
+
+        .card header {
+            padding: 14px 16px;
+            background: var(--accent-soft);
+            border-bottom: 1px solid var(--line);
+        }
+
+        .card h2 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .card img {
+            display: block;
+            width: 100%;
+            height: auto;
+            background: white;
+        }
+
+        .empty {
+            margin-top: 22px;
+            padding: 22px;
+            border-radius: 18px;
+            border: 1px dashed var(--line);
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        .dates {
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <section class="hero">
+            <h1>HRRR Plot Viewer</h1>
+            <p>Browse saved HRRR 2 m temperature plots by date. New day folders appear automatically when your download script writes them.</p>
+
+            <form class="toolbar" method="get">
+                <label for="date">Date</label>
+                <select id="date" name="date">
+                    {% for date in available_dates %}
+                    <option value="{{ date }}" {% if date == selected_date %}selected{% endif %}>{{ date }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit">View Plots</button>
+            </form>
+
+            {% if available_dates %}
+            <div class="dates">Available dates: {{ available_dates | join(', ') }}</div>
+            {% endif %}
+        </section>
+
+        {% if plots %}
+        <section class="grid">
+            {% for plot in plots %}
+            <article class="card">
+                <header>
+                    <h2>{{ plot.label }}</h2>
+                </header>
+                <a href="{{ plot.url }}" target="_blank" rel="noreferrer">
+                    <img src="{{ plot.url }}" alt="{{ plot.label }}">
+                </a>
+            </article>
+            {% endfor %}
+        </section>
+        {% else %}
+        <section class="empty">
+            {% if selected_date %}
+            No plots were found for {{ selected_date }}.
+            {% else %}
+            No dated output folders were found yet. Run the HRRR download script first so it writes into /var/data/output.
+            {% endif %}
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>
