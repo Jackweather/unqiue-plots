@@ -69,6 +69,51 @@
             flex-wrap: wrap;
         }
 
+        .download-panel {
+            margin-top: 18px;
+            padding: 16px;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.55);
+        }
+
+        .download-panel h2 {
+            margin: 0 0 10px;
+            font-size: 1.05rem;
+        }
+
+        .download-panel p {
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+        }
+
+        .download-form {
+            display: grid;
+            gap: 12px;
+        }
+
+        .download-options {
+            display: grid;
+            gap: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            padding: 12px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: rgba(251, 248, 243, 0.9);
+        }
+
+        .download-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 400;
+        }
+
+        .download-option input {
+            margin: 0;
+        }
+
         label {
             font-weight: 700;
         }
@@ -166,13 +211,34 @@
                 <div class="toolbar-actions">
                     <button type="submit">View Plots</button>
                     {% if selected_date and raw_grib_available %}
-                    <a class="download-link" href="/downloads/{{ selected_date }}/raw-grib.zip">Download Original GRIB Folder</a>
+                    <a class="download-link" href="/downloads/raw-grib.zip?date={{ selected_date }}">Download Selected Date</a>
                     {% endif %}
                 </div>
             </form>
 
             {% if available_dates %}
             <div class="dates">Available dates: {{ available_dates | join(', ') }}</div>
+            {% endif %}
+
+            {% if downloadable_dates %}
+            <section class="download-panel">
+                <h2>Download Raw GRIB Zip</h2>
+                <p>Choose one date, several dates, or download every available date in one zip.</p>
+                <form class="download-form" method="get" action="/downloads/raw-grib.zip">
+                    <div class="download-options">
+                        {% for date in downloadable_dates %}
+                        <label class="download-option" for="download-date-{{ date }}">
+                            <input id="download-date-{{ date }}" type="checkbox" name="date" value="{{ date }}" {% if date == selected_date %}checked{% endif %}>
+                            <span>{{ date }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <div class="toolbar-actions">
+                        <button type="submit">Download Checked Dates</button>
+                        <a class="download-link" href="/downloads/raw-grib.zip?all=1">Download All Dates</a>
+                    </div>
+                </form>
+            </section>
             {% endif %}
         </section>
 
