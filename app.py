@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 import subprocess
 import threading
+from zipfile import ZIP_DEFLATED, ZipFile
 
-from flask import Flask, abort, render_template, request, send_from_directory
+from flask import Flask, abort, render_template, request, send_file, send_from_directory
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -83,6 +85,28 @@ def get_plot_entries(date_dir: Path) -> list[dict[str, str]]:
     return entries
 
 
+def get_raw_grib_dir(date_str: str) -> Path:
+    return OUTPUT_DIR / date_str / "raw_grib"
+
+
+def create_raw_grib_archive(date_str: str) -> BytesIO:
+    raw_dir = get_raw_grib_dir(date_str)
+    if not raw_dir.exists():
+        abort(404)
+
+    archive_buffer = BytesIO()
+    with ZipFile(archive_buffer, "w", compression=ZIP_DEFLATED) as archive:
+        for grib_path in sorted(raw_dir.rglob("*.grib2")):
+            archive_path = Path(date_str) / grib_path.relative_to(raw_dir)
+            archive.write(grib_path, arcname=str(archive_path))
+
+    if archive_buffer.getbuffer().nbytes == 0:
+        abort(404)
+
+    archive_buffer.seek(0)
+    return archive_buffer
+
+
 @app.route("/")
 def index() -> str:
     date_dirs = get_date_directories()
@@ -99,6 +123,7 @@ def index() -> str:
         available_dates=[path.name for path in date_dirs],
         selected_date=selected_date,
         plots=plots,
+        raw_grib_available=bool(selected_date and get_raw_grib_dir(selected_date).exists()),
     )
 
 
@@ -110,11 +135,24 @@ def serve_plot(date_str: str, filename: str):
     return send_from_directory(plot_dir, filename)
 
 
+@app.route("/downloads/<date_str>/raw-grib.zip")
+def download_raw_grib_archive(date_str: str):
+    archive_buffer = create_raw_grib_archive(date_str)
+    return send_file(
+        archive_buffer,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"{date_str}_raw_grib.zip",
+    )
+
+
 @app.route("/run-task1")
 def run_task1():
     scripts = [
         resolve_script_path(
-            "/opt/render/project/src/hrrr_dc_temp_grid.py","hrrr_dc_temp_grid.py"),
+            "/opt/render/project/src/hrrr_dc_temp_grid.py",
+            "hrrr_dc_temp_grid.py",
+        ),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, 1), daemon=True).start()
     return f"Task started in background! Check {LOG_DIR} for output.", 200
