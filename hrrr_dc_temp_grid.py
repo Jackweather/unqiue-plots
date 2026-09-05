@@ -83,9 +83,14 @@ def build_url(date_str: str, cycle_hour: int, forecast_hour: int) -> str:
     return prepared.url
 
 
+def get_run_grib_dir(raw_dir: Path, cycle_hour: int) -> Path:
+    return raw_dir / f"{cycle_hour:02d}z"
+
+
 def save_raw_grib(content: bytes, raw_dir: Path, cycle_hour: int, forecast_hour: int) -> Path:
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    raw_file = raw_dir / f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.tmp2m.grib2"
+    run_dir = get_run_grib_dir(raw_dir, cycle_hour)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    raw_file = run_dir / f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.tmp2m.grib2"
     raw_file.write_bytes(content)
     return raw_file
 
@@ -123,9 +128,17 @@ def load_or_download_grib(
     timeout: int,
     raw_dir: Path,
 ) -> Path | None:
-    raw_file = raw_dir / f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.tmp2m.grib2"
+    run_dir = get_run_grib_dir(raw_dir, cycle_hour)
+    raw_file = run_dir / f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.tmp2m.grib2"
     if raw_file.exists():
         print(f"  using cached f{forecast_hour:02d}", flush=True)
+        return raw_file
+
+    legacy_raw_file = raw_dir / f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.tmp2m.grib2"
+    if legacy_raw_file.exists():
+        print(f"  using legacy cached f{forecast_hour:02d}", flush=True)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        legacy_raw_file.replace(raw_file)
         return raw_file
 
     print(f"  downloading f{forecast_hour:02d}", flush=True)
