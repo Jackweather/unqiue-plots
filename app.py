@@ -89,16 +89,29 @@ def get_raw_grib_dir(date_str: str) -> Path:
     return OUTPUT_DIR / date_str / "raw_grib"
 
 
-def create_raw_grib_archive(date_str: str) -> BytesIO:
-    raw_dir = get_raw_grib_dir(date_str)
-    if not raw_dir.exists():
+def get_downloadable_dates(date_dirs: list[Path], requested_dates: list[str], include_all: bool) -> list[str]:
+    available_dates = [path.name for path in date_dirs if get_raw_grib_dir(path.name).exists()]
+    if include_all:
+        return available_dates
+
+    valid_dates = [date_str for date_str in requested_dates if date_str in available_dates]
+    return valid_dates
+
+
+def create_raw_grib_archive(date_strs: list[str]) -> BytesIO:
+    if not date_strs:
         abort(404)
 
     archive_buffer = BytesIO()
     with ZipFile(archive_buffer, "w", compression=ZIP_DEFLATED) as archive:
-        for grib_path in sorted(raw_dir.rglob("*.grib2")):
-            archive_path = Path(date_str) / grib_path.relative_to(raw_dir)
-            archive.write(grib_path, arcname=str(archive_path))
+        for date_str in date_strs:
+            raw_dir = get_raw_grib_dir(date_str)
+            if not raw_dir.exists():
+                continue
+
+            for grib_path in sorted(raw_dir.rglob("*.grib2")):
+                archive_path = Path(date_str) / grib_path.relative_to(raw_dir)
+                archive.write(grib_path, arcname=str(archive_path))
 
     if archive_buffer.getbuffer().nbytes == 0:
         abort(404)
@@ -117,12 +130,14 @@ def index() -> str:
 
     selected_date = selected_dir.name if selected_dir else None
     plots = get_plot_entries(selected_dir) if selected_dir else []
+    downloadable_dates = [path.name for path in date_dirs if get_raw_grib_dir(path.name).exists()]
 
     return render_template(
         "index.html",
         available_dates=[path.name for path in date_dirs],
         selected_date=selected_date,
         plots=plots,
+        downloadable_dates=downloadable_dates,
         raw_grib_available=bool(selected_date and get_raw_grib_dir(selected_date).exists()),
     )
 
@@ -135,14 +150,25 @@ def serve_plot(date_str: str, filename: str):
     return send_from_directory(plot_dir, filename)
 
 
-@app.route("/downloads/<date_str>/raw-grib.zip")
-def download_raw_grib_archive(date_str: str):
-    archive_buffer = create_raw_grib_archive(date_str)
+@app.route("/downloads/raw-grib.zip")
+def download_raw_grib_archive():
+    date_dirs = get_date_directories()
+    requested_dates = request.args.getlist("date")
+    include_all = request.args.get("all") == "1"
+    date_strs = get_downloadable_dates(date_dirs, requested_dates, include_all)
+    archive_buffer = create_raw_grib_archive(date_strs)
+    if include_all:
+        download_name = "all_dates_raw_grib.zip"
+    elif len(date_strs) == 1:
+        download_name = f"{date_strs[0]}_raw_grib.zip"
+    else:
+        download_name = f"selected_dates_{len(date_strs)}_raw_grib.zip"
+
     return send_file(
         archive_buffer,
         mimetype="application/zip",
         as_attachment=True,
-        download_name=f"{date_str}_raw_grib.zip",
+        download_name=download_name,
     )
 
 
