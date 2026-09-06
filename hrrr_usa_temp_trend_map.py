@@ -19,13 +19,14 @@ DEFAULT_DATE_FORMAT = "%Y%m%d"
 DEFAULT_OUTPUT_DIR = "/var/data/output"
 DEFAULT_TIMEOUT = 60
 DEFAULT_MAX_FORECAST_HOUR = 18
-DEFAULT_SMOOTHING_SIGMA = 2.2
+DEFAULT_SMOOTHING_SIGMA = 4.0
 CONUS_BOUNDS = {
     "leftlon": -125.0,
     "rightlon": -66.5,
     "bottomlat": 24.0,
     "toplat": 49.5,
 }
+FIELD_CACHE: dict[tuple[int, int], tuple[np.ndarray, np.ndarray, np.ndarray, datetime] | None] = {}
 
 
 @dataclass(frozen=True)
@@ -144,6 +145,28 @@ def load_temperature_field(grib_file: Path) -> tuple[np.ndarray, np.ndarray, np.
         return lats, lons, temp_f, valid_time
 
 
+def get_temperature_field(
+    session: requests.Session,
+    date_str: str,
+    cycle_hour: int,
+    forecast_hour: int,
+    timeout: int,
+    raw_dir: Path,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, datetime] | None:
+    cache_key = (cycle_hour, forecast_hour)
+    if cache_key in FIELD_CACHE:
+        return FIELD_CACHE[cache_key]
+
+    grib_file = load_or_download_grib(session, date_str, cycle_hour, forecast_hour, timeout, raw_dir)
+    if grib_file is None:
+        FIELD_CACHE[cache_key] = None
+        return None
+
+    field = load_temperature_field(grib_file)
+    FIELD_CACHE[cache_key] = field
+    return field
+
+
 def smooth_field(field: np.ndarray, sigma: float) -> np.ndarray:
     mask = np.isfinite(field)
     if not np.any(mask):
@@ -167,11 +190,11 @@ def collect_forecast_trend(
     raw_dir: Path,
     smoothing_sigma: float,
 ) -> ForecastTrend | None:
-    current_file = load_or_download_grib(session, date_str, cycle_hour, forecast_hour, timeout, raw_dir)
-    if current_file is None:
+    current_field = get_temperature_field(session, date_str, cycle_hour, forecast_hour, timeout, raw_dir)
+    if current_field is None:
         return None
 
-    current_lats, current_lons, current_temp_f, valid_time = load_temperature_field(current_file)
+    current_lats, current_lons, current_temp_f, valid_time = current_field
 
     if cycle_hour == 0:
         smoothed = smooth_field(current_temp_f, smoothing_sigma)
@@ -189,11 +212,11 @@ def collect_forecast_trend(
     prior_fields: list[np.ndarray] = []
     comparison_cycle_hours: list[int] = []
     for previous_cycle_hour in range(0, cycle_hour):
-        previous_file = load_or_download_grib(session, date_str, previous_cycle_hour, forecast_hour, timeout, raw_dir)
-        if previous_file is None:
+        previous_field = get_temperature_field(session, date_str, previous_cycle_hour, forecast_hour, timeout, raw_dir)
+        if previous_field is None:
             continue
 
-        previous_lats, previous_lons, previous_temp_f, _ = load_temperature_field(previous_file)
+        previous_lats, previous_lons, previous_temp_f, _ = previous_field
         if current_temp_f.shape != previous_temp_f.shape:
             continue
         if current_lats.shape != previous_lats.shape or current_lons.shape != previous_lons.shape:
@@ -236,11 +259,12 @@ def draw_trend_map(trend: ForecastTrend, output_path: Path, date_str: str) -> No
         levels = np.linspace(vmin, vmax, 17)
         cmap = "coolwarm"
         extend = "both"
+        colorbar_ticks = None
     else:
-        vmax = max(2.0, float(np.nanpercentile(np.abs(trend.field_f), 95)))
-        levels = np.linspace(-vmax, vmax, 17)
+        levels = np.arange(-5, 5.5, 0.5)
         cmap = "RdBu_r"
         extend = "both"
+        colorbar_ticks = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]
     mesh = ax.contourf(
         trend.lons,
         trend.lats,
@@ -282,8 +306,8 @@ def draw_trend_map(trend: ForecastTrend, output_path: Path, date_str: str) -> No
             fontsize=16,
             pad=16,
         )
-        note = "Red = warmer than earlier runs | Blue = cooler than earlier runs | Smoothed field"
-        colorbar_label = "Temperature change versus earlier runs (F)"
+        note = "Red = warmer than earlier runs | Blue = cooler than earlier runs | 0 is neutral"
+        colorbar_label = "Temperature trend scale: -5 cooler to 0 neutral to 5 warmer"
 
     ax.text(
         0.01,
@@ -296,6 +320,8 @@ def draw_trend_map(trend: ForecastTrend, output_path: Path, date_str: str) -> No
 
     colorbar = fig.colorbar(mesh, ax=ax, orientation="horizontal", pad=0.04, shrink=0.82)
     colorbar.set_label(colorbar_label)
+    if colorbar_ticks is not None:
+        colorbar.set_ticks(colorbar_ticks)
 
     fig.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -305,6 +331,7 @@ def draw_trend_map(trend: ForecastTrend, output_path: Path, date_str: str) -> No
 
 def main() -> None:
     args = parse_args()
+    FIELD_CACHE.clear()
     output_dir = Path(args.output_dir)
     date_dir = output_dir / args.date
     raw_dir = date_dir / "raw_grib_usa_temp_trend"
