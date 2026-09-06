@@ -19,11 +19,15 @@ from location_catalog import iter_location_specs
 NOMADS_FILTER_URL = "https://nomads.ncep.noaa.gov/cgi-bin/filter_hrrr_2d.pl"
 DEFAULT_DATE_FORMAT = "%Y%m%d"
 DEFAULT_OUTPUT_DIR = "/var/data/output"
+DEFAULT_CACHE_DIR = "/var/data"
+DEFAULT_MAX_LOCATIONS_PER_STATE = 1
 GEOCODE_CACHE_FILE = "location_coordinates.json"
 GEOCODER_URL = "https://nominatim.openstreetmap.org/search"
 GEOCODER_MAX_ATTEMPTS = 5
 GEOCODER_RETRY_BASE_SECONDS = 2
 LOCATIONS: dict[str, dict[str, str | float]] | None = None
+LOCATION_BOUNDS: tuple[float, float, float, float] | None = None
+ACTIVE_LOCATION_SPECS: list[dict[str, str | None]] | None = None
 
 
 @dataclass(frozen=True)
@@ -71,7 +75,24 @@ def parse_args() -> argparse.Namespace:
         default=60,
         help="HTTP timeout in seconds for each request.",
     )
+    parser.add_argument(
+        "--max-locations-per-state",
+        type=int,
+        default=DEFAULT_MAX_LOCATIONS_PER_STATE,
+        help="Number of cities to process per supported state. Default is 1 for faster runs.",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        default=DEFAULT_CACHE_DIR,
+        help="Directory for persistent coordinate cache data. Defaults to /var/data.",
+    )
     return parser.parse_args()
+
+
+def get_active_location_specs() -> list[dict[str, str | None]]:
+    if ACTIVE_LOCATION_SPECS is None:
+        return iter_location_specs(DEFAULT_MAX_LOCATIONS_PER_STATE)
+    return ACTIVE_LOCATION_SPECS
 
 
 def load_coordinate_cache(cache_path: Path) -> dict[str, dict[str, float]]:
@@ -81,6 +102,7 @@ def load_coordinate_cache(cache_path: Path) -> dict[str, dict[str, float]]:
 
 
 def save_coordinate_cache(cache_path: Path, cache: dict[str, dict[str, float]]) -> None:
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path.write_text(json.dumps(cache, indent=2, sort_keys=True), encoding="utf-8")
 
 
@@ -120,8 +142,8 @@ def geocode_location(session: requests.Session, city_label: str, state_label: st
     )
 
 
-def load_locations(base_dir: Path) -> dict[str, dict[str, str | float]]:
-    cache_path = base_dir / GEOCODE_CACHE_FILE
+def load_locations(cache_dir: Path) -> dict[str, dict[str, str | float]]:
+    cache_path = cache_dir / GEOCODE_CACHE_FILE
     cache = load_coordinate_cache(cache_path)
     geocode_session = requests.Session()
     locations: dict[str, dict[str, str | float]] = {}
@@ -129,7 +151,7 @@ def load_locations(base_dir: Path) -> dict[str, dict[str, str | float]]:
 
     print("Loading configured locations", flush=True)
 
-    for spec in iter_location_specs():
+    for spec in get_active_location_specs():
         location_key = str(spec["location_key"])
         model_domain = spec["model_domain"]
         if model_domain is None:
@@ -165,24 +187,46 @@ def load_locations(base_dir: Path) -> dict[str, dict[str, str | float]]:
 def get_locations() -> dict[str, dict[str, str | float]]:
     global LOCATIONS
     if LOCATIONS is None:
-        LOCATIONS = load_locations(Path(__file__).resolve().parent)
+        LOCATIONS = load_locations(Path(DEFAULT_CACHE_DIR))
     return LOCATIONS
 
 
+def configure_runtime(max_locations_per_state: int, cache_dir: str) -> None:
+    global ACTIVE_LOCATION_SPECS, LOCATIONS, LOCATION_BOUNDS
+    ACTIVE_LOCATION_SPECS = iter_location_specs(max_locations_per_state)
+    LOCATIONS = None
+    LOCATION_BOUNDS = None
+
+    cache_path = Path(cache_dir)
+    if cache_path.exists():
+        global DEFAULT_CACHE_DIR
+        DEFAULT_CACHE_DIR = str(cache_path)
+    else:
+        DEFAULT_CACHE_DIR = cache_dir
+
+
+def get_location_bounds() -> tuple[float, float, float, float]:
+    global LOCATION_BOUNDS
+    if LOCATION_BOUNDS is None:
+        locations = get_locations()
+        lats = [float(location["lat"]) for location in locations.values()]
+        lons = [float(location["lon"]) for location in locations.values()]
+        LOCATION_BOUNDS = (min(lons) - 0.25, max(lons) + 0.25, min(lats) - 0.25, max(lats) + 0.25)
+    return LOCATION_BOUNDS
+
+
 def build_url(date_str: str, cycle_hour: int, forecast_hour: int) -> str:
-    locations = get_locations()
-    lats = [location["lat"] for location in locations.values()]
-    lons = [location["lon"] for location in locations.values()]
+    left_lon, right_lon, bottom_lat, top_lat = get_location_bounds()
     query = {
         "dir": f"/hrrr.{date_str}/conus",
         "file": f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.grib2",
         "var_TMP": "on",
         "lev_2_m_above_ground": "on",
         "subregion": "1",
-        "leftlon": str(min(lons) - 0.25),
-        "rightlon": str(max(lons) + 0.25),
-        "bottomlat": str(min(lats) - 0.25),
-        "toplat": str(max(lats) + 0.25),
+        "leftlon": str(left_lon),
+        "rightlon": str(right_lon),
+        "bottomlat": str(bottom_lat),
+        "toplat": str(top_lat),
     }
     prepared = requests.Request("GET", NOMADS_FILTER_URL, params=query).prepare()
     return prepared.url
@@ -362,10 +406,11 @@ def build_outputs(records: list[RunRecord], output_dir: Path, date_str: str) -> 
 
     output_paths: list[Path] = []
     locations = get_locations()
+    records_by_location = {location_key: frame for location_key, frame in tidy.groupby("location_key")}
     print("Building CSV and plot outputs", flush=True)
     for location_key, location in locations.items():
-        location_rows = tidy[tidy["location_key"] == location_key]
-        if location_rows.empty:
+        location_rows = records_by_location.get(location_key)
+        if location_rows is None or location_rows.empty:
             continue
 
         grid = location_rows.pivot(index="run_time_utc", columns="valid_time_utc", values="temp_f").sort_index(axis=0).sort_index(axis=1)
@@ -416,14 +461,17 @@ def write_heatmap(grid: pd.DataFrame, png_path: Path, date_str: str, location_la
 
 def main() -> None:
     args = parse_args()
+    configure_runtime(args.max_locations_per_state, args.cache_dir)
     output_dir = Path(args.output_dir)
     raw_dir = output_dir / args.date / "raw_grib"
 
     print(f"Starting HRRR temperature grid run for {args.date}", flush=True)
     print(f"Output directory: {output_dir}", flush=True)
+    print(f"Cache directory: {args.cache_dir}", flush=True)
+    print(f"Max locations per state: {args.max_locations_per_state}", flush=True)
     get_locations()
 
-    unsupported_specs = [spec for spec in iter_location_specs() if spec["model_domain"] is None]
+    unsupported_specs = [spec for spec in get_active_location_specs() if spec["model_domain"] is None]
     if unsupported_specs:
         unsupported_states = sorted({str(spec["state_label"]) for spec in unsupported_specs})
         print(
