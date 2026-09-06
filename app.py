@@ -17,7 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path("/var/data")
 OUTPUT_DIR = DATA_DIR / "output"
 LOG_DIR = DATA_DIR / "logs"
-RENDER_BASE_DIR = Path("/opt/render/project/src/NY")
+RENDER_BASE_DIR = Path("/opt/render/project/src/")
 
 app = Flask(__name__)
 
@@ -201,11 +201,13 @@ def download_raw_grib_archive():
 @app.route("/run-task1")
 def run_task1():
     scripts = [
-        ("/opt/render/project/src/hrrr_dc_temp_grid.py", "hrrr_dc_temp_grid.py"),
-        # Add more GFS scripts here as needed
+        resolve_script_path(
+            "/opt/render/project/src/hrrr_dc_temp_grid.py",
+            "hrrr_dc_temp_grid.py",
+        ),
     ]
-    threading.Thread(target=lambda: run_scripts(scripts, 1)).start()
-    return "Task 1 started in background! Check logs folder for output.", 200
+    threading.Thread(target=lambda: run_scripts(scripts, 1), daemon=True).start()
+    return f"Task started in background! Check {LOG_DIR} for output.", 200
 
 
 
