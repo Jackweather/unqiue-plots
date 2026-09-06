@@ -21,6 +21,8 @@ DEFAULT_DATE_FORMAT = "%Y%m%d"
 DEFAULT_OUTPUT_DIR = "/var/data/output"
 GEOCODE_CACHE_FILE = "location_coordinates.json"
 GEOCODER_URL = "https://nominatim.openstreetmap.org/search"
+GEOCODER_MAX_ATTEMPTS = 5
+GEOCODER_RETRY_BASE_SECONDS = 2
 LOCATIONS: dict[str, dict[str, str | float]] | None = None
 
 
@@ -83,17 +85,39 @@ def save_coordinate_cache(cache_path: Path, cache: dict[str, dict[str, float]]) 
 
 
 def geocode_location(session: requests.Session, city_label: str, state_label: str) -> tuple[float, float]:
-    response = session.get(
-        GEOCODER_URL,
-        params={"q": f"{city_label}, {state_label}, USA", "format": "jsonv2", "limit": 1},
-        timeout=30,
-        headers={"User-Agent": "hrrr-state-grid/1.0"},
+    query = f"{city_label}, {state_label}, USA"
+    for attempt in range(1, GEOCODER_MAX_ATTEMPTS + 1):
+        response = session.get(
+            GEOCODER_URL,
+            params={"q": query, "format": "jsonv2", "limit": 1},
+            timeout=30,
+            headers={"User-Agent": "hrrr-state-grid/1.0"},
+        )
+
+        if response.status_code == 429 and attempt < GEOCODER_MAX_ATTEMPTS:
+            retry_after = response.headers.get("Retry-After")
+            if retry_after and retry_after.isdigit():
+                wait_seconds = int(retry_after)
+            else:
+                wait_seconds = GEOCODER_RETRY_BASE_SECONDS * attempt
+            print(
+                f"  geocoder rate-limited for {query}; retrying in {wait_seconds}s "
+                f"({attempt}/{GEOCODER_MAX_ATTEMPTS})",
+                flush=True,
+            )
+            time.sleep(wait_seconds)
+            continue
+
+        response.raise_for_status()
+        results = response.json()
+        if not results:
+            raise ValueError(f"No coordinates found for {city_label}, {state_label}.")
+        return float(results[0]["lat"]), float(results[0]["lon"])
+
+    raise RuntimeError(
+        f"Geocoding failed for {query} after {GEOCODER_MAX_ATTEMPTS} attempts. "
+        f"Seed {GEOCODE_CACHE_FILE} with this location or retry later."
     )
-    response.raise_for_status()
-    results = response.json()
-    if not results:
-        raise ValueError(f"No coordinates found for {city_label}, {state_label}.")
-    return float(results[0]["lat"]), float(results[0]["lon"])
 
 
 def load_locations(base_dir: Path) -> dict[str, dict[str, str | float]]:
