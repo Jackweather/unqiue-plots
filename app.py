@@ -9,6 +9,8 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from flask import Flask, abort, render_template, request, send_file, send_from_directory
 
+from location_catalog import get_state_options
+
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path("/var/data")
@@ -67,19 +69,28 @@ def get_date_directories() -> list[Path]:
     )
 
 
-def get_plot_entries(date_dir: Path) -> list[dict[str, str]]:
-    plot_dir = date_dir / "plots"
+STATE_OPTIONS = get_state_options()
+STATE_LABELS = {str(option["key"]): str(option["label"]) for option in STATE_OPTIONS}
+SUPPORTED_STATES = [str(option["key"]) for option in STATE_OPTIONS if bool(option["supported"])]
+
+
+def get_plot_entries(date_dir: Path, state_key: str | None) -> list[dict[str, str]]:
+    plot_root = date_dir / "plots"
+    if not plot_root.exists() or not state_key:
+        return []
+
+    plot_dir = plot_root / state_key
     if not plot_dir.exists():
         return []
 
     entries: list[dict[str, str]] = []
     for plot_path in sorted(plot_dir.glob("*.png")):
-        label = plot_path.stem.replace("hrrr_", "").replace("_temp_grid_", " ").replace("_", " ").title()
+        city_name = plot_path.stem.replace("hrrr_", "").replace("_temp_grid_", " ").replace("_", " ").title()
         entries.append(
             {
                 "name": plot_path.name,
-                "label": label,
-                "url": f"/plots/{date_dir.name}/{plot_path.name}",
+                "label": f"{city_name} | {STATE_LABELS.get(state_key, state_key.title())}",
+                "url": f"/plots/{date_dir.name}/{state_key}/{plot_path.name}",
             }
         )
     return entries
@@ -124,27 +135,32 @@ def create_raw_grib_archive(date_strs: list[str]) -> BytesIO:
 def index() -> str:
     date_dirs = get_date_directories()
     requested_date = request.args.get("date")
+    requested_state = request.args.get("state")
     selected_dir = next((path for path in date_dirs if path.name == requested_date), None)
     if selected_dir is None and date_dirs:
         selected_dir = date_dirs[0]
 
     selected_date = selected_dir.name if selected_dir else None
-    plots = get_plot_entries(selected_dir) if selected_dir else []
+    selected_state = requested_state if requested_state in STATE_LABELS else (SUPPORTED_STATES[0] if SUPPORTED_STATES else None)
+    plots = get_plot_entries(selected_dir, selected_state) if selected_dir else []
     downloadable_dates = [path.name for path in date_dirs if get_raw_grib_dir(path.name).exists()]
 
     return render_template(
         "index.html",
         available_dates=[path.name for path in date_dirs],
         selected_date=selected_date,
+        selected_state=selected_state,
+        selected_state_label=STATE_LABELS.get(selected_state, "Selected State") if selected_state else None,
+        state_options=STATE_OPTIONS,
         plots=plots,
         downloadable_dates=downloadable_dates,
         raw_grib_available=bool(selected_date and get_raw_grib_dir(selected_date).exists()),
     )
 
 
-@app.route("/plots/<date_str>/<filename>")
-def serve_plot(date_str: str, filename: str):
-    plot_dir = OUTPUT_DIR / date_str / "plots"
+@app.route("/plots/<date_str>/<state_key>/<filename>")
+def serve_plot(date_str: str, state_key: str, filename: str):
+    plot_dir = OUTPUT_DIR / date_str / "plots" / state_key
     if not plot_dir.exists():
         abort(404)
     return send_from_directory(plot_dir, filename)

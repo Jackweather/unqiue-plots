@@ -114,6 +114,12 @@
             margin: 0;
         }
 
+        .state-note {
+            margin-top: 12px;
+            font-size: 0.92rem;
+            color: var(--muted);
+        }
+
         label {
             font-weight: 700;
         }
@@ -199,13 +205,19 @@
     <main class="shell">
         <section class="hero">
             <h1>HRRR Plot Viewer</h1>
-            <p>Browse saved HRRR 2 m temperature plots by date. New day folders appear automatically when your download script writes them.</p>
+            <p>Browse saved HRRR 2 m temperature plots by date and state. New day folders appear automatically when your download script writes them.</p>
 
             <form class="toolbar" method="get">
                 <label for="date">Date</label>
                 <select id="date" name="date">
                     {% for date in available_dates %}
                     <option value="{{ date }}" {% if date == selected_date %}selected{% endif %}>{{ date }}</option>
+                    {% endfor %}
+                </select>
+                <label for="state">State</label>
+                <select id="state" name="state">
+                    {% for state in state_options %}
+                    <option value="{{ state.key }}" {% if state.key == selected_state %}selected{% endif %}>{{ state.label }}{% if not state.supported %} (not in current HRRR workflow){% endif %}</option>
                     {% endfor %}
                 </select>
                 <div class="toolbar-actions">
@@ -218,6 +230,10 @@
 
             {% if available_dates %}
             <div class="dates">Available dates: {{ available_dates | join(', ') }}</div>
+            {% endif %}
+
+            {% if selected_state %}
+            <div class="state-note">Viewing state: {{ selected_state_label }}. Alaska and Hawaii are listed, but this version only generates plots for the current HRRR CONUS coverage.</div>
             {% endif %}
 
             {% if downloadable_dates %}
@@ -258,7 +274,7 @@
         {% else %}
         <section class="empty">
             {% if selected_date %}
-            No plots were found for {{ selected_date }}.
+            No plots were found for {{ selected_state_label or 'the selected state' }} on {{ selected_date }}.
             {% else %}
             No dated output folders were found yet. Run the HRRR download script first so it writes into /var/data/output.
             {% endif %}

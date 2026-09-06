@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,19 +13,23 @@ import pandas as pd
 import requests
 import xarray as xr
 
+from location_catalog import iter_location_specs
+
 
 NOMADS_FILTER_URL = "https://nomads.ncep.noaa.gov/cgi-bin/filter_hrrr_2d.pl"
 DEFAULT_DATE_FORMAT = "%Y%m%d"
 DEFAULT_OUTPUT_DIR = "/var/data/output"
-LOCATIONS = {
-    "dc": {"label": "Washington, DC", "lat": 38.9072, "lon": -77.0369},
-    "hyattsville_md": {"label": "Hyattsville, MD", "lat": 38.9559, "lon": -76.9450},
-}
+GEOCODE_CACHE_FILE = "location_coordinates.json"
+GEOCODER_URL = "https://nominatim.openstreetmap.org/search"
 
 
 @dataclass(frozen=True)
 class RunRecord:
     location_key: str
+    state_key: str
+    state_label: str
+    city_key: str
+    region_label: str
     location_label: str
     run_time: datetime
     forecast_hour: int
@@ -36,8 +42,8 @@ class RunRecord:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Download HRRR 2 m temperature for Washington, DC from today's 00z run "
-            "through the most recent available run, then write a spreadsheet-style grid."
+            "Download HRRR 2 m temperature grids for the configured state and city points "
+            "through the most recent available run, then write spreadsheet-style plots."
         )
     )
     parser.add_argument(
@@ -63,6 +69,65 @@ def parse_args() -> argparse.Namespace:
         help="HTTP timeout in seconds for each request.",
     )
     return parser.parse_args()
+
+
+def load_coordinate_cache(cache_path: Path) -> dict[str, dict[str, float]]:
+    if not cache_path.exists():
+        return {}
+    return json.loads(cache_path.read_text(encoding="utf-8"))
+
+
+def save_coordinate_cache(cache_path: Path, cache: dict[str, dict[str, float]]) -> None:
+    cache_path.write_text(json.dumps(cache, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def geocode_location(session: requests.Session, city_label: str, state_label: str) -> tuple[float, float]:
+    response = session.get(
+        GEOCODER_URL,
+        params={"q": f"{city_label}, {state_label}, USA", "format": "jsonv2", "limit": 1},
+        timeout=30,
+        headers={"User-Agent": "hrrr-state-grid/1.0"},
+    )
+    response.raise_for_status()
+    results = response.json()
+    if not results:
+        raise ValueError(f"No coordinates found for {city_label}, {state_label}.")
+    return float(results[0]["lat"]), float(results[0]["lon"])
+
+
+def load_locations(base_dir: Path) -> dict[str, dict[str, str | float]]:
+    cache_path = base_dir / GEOCODE_CACHE_FILE
+    cache = load_coordinate_cache(cache_path)
+    geocode_session = requests.Session()
+    locations: dict[str, dict[str, str | float]] = {}
+
+    for spec in iter_location_specs():
+        location_key = str(spec["location_key"])
+        model_domain = spec["model_domain"]
+        if model_domain is None:
+            continue
+
+        if location_key not in cache:
+            lat, lon = geocode_location(geocode_session, str(spec["city_label"]), str(spec["state_label"]))
+            cache[location_key] = {"lat": lat, "lon": lon}
+            save_coordinate_cache(cache_path, cache)
+            time.sleep(1)
+
+        locations[location_key] = {
+            "state_key": str(spec["state_key"]),
+            "state_label": str(spec["state_label"]),
+            "city_key": str(spec["city_key"]),
+            "city_label": str(spec["city_label"]),
+            "region_label": str(spec["region_label"]),
+            "label": f"{spec['city_label']}, {spec['state_label']} ({spec['region_label']})",
+            "lat": float(cache[location_key]["lat"]),
+            "lon": float(cache[location_key]["lon"]),
+        }
+
+    return locations
+
+
+LOCATIONS = load_locations(Path(__file__).resolve().parent)
 
 
 def build_url(date_str: str, cycle_hour: int, forecast_hour: int) -> str:
@@ -177,6 +242,10 @@ def try_fetch_record(
             records.append(
                 RunRecord(
                     location_key,
+                    str(location["state_key"]),
+                    str(location["state_label"]),
+                    str(location["city_key"]),
+                    str(location["region_label"]),
                     location["label"],
                     run_time,
                     forecast_hour,
@@ -233,6 +302,10 @@ def build_outputs(records: list[RunRecord], output_dir: Path, date_str: str) -> 
     tidy = pd.DataFrame(
         {
             "location_key": [record.location_key for record in records],
+            "state_key": [record.state_key for record in records],
+            "state_label": [record.state_label for record in records],
+            "city_key": [record.city_key for record in records],
+            "region_label": [record.region_label for record in records],
             "location_label": [record.location_label for record in records],
             "run_time_utc": [record.run_time for record in records],
             "forecast_hour": [record.forecast_hour for record in records],
@@ -249,12 +322,21 @@ def build_outputs(records: list[RunRecord], output_dir: Path, date_str: str) -> 
     output_paths: list[Path] = []
     for location_key, location in LOCATIONS.items():
         location_rows = tidy[tidy["location_key"] == location_key]
+        if location_rows.empty:
+            continue
+
         grid = location_rows.pivot(index="run_time_utc", columns="valid_time_utc", values="temp_f").sort_index(axis=0).sort_index(axis=1)
         grid.index = [ts.strftime("%Y-%m-%d %HZ") for ts in pd.to_datetime(grid.index, utc=True)]
         grid.columns = [ts.strftime("%m-%d %HZ") for ts in pd.to_datetime(grid.columns, utc=True)]
 
-        csv_path = csv_dir / f"hrrr_{location_key}_temp_grid_{date_str}.csv"
-        png_path = plot_dir / f"hrrr_{location_key}_temp_grid_{date_str}.png"
+        state_csv_dir = csv_dir / str(location["state_key"])
+        state_plot_dir = plot_dir / str(location["state_key"])
+        state_csv_dir.mkdir(parents=True, exist_ok=True)
+        state_plot_dir.mkdir(parents=True, exist_ok=True)
+
+        city_key = str(location["city_key"])
+        csv_path = state_csv_dir / f"hrrr_{city_key}_temp_grid_{date_str}.csv"
+        png_path = state_plot_dir / f"hrrr_{city_key}_temp_grid_{date_str}.png"
         grid.to_csv(csv_path)
         write_heatmap(grid, png_path, date_str, location["label"])
         output_paths.extend([csv_path, png_path])
@@ -292,6 +374,14 @@ def main() -> None:
     args = parse_args()
     output_dir = Path(args.output_dir)
     raw_dir = output_dir / args.date / "raw_grib"
+
+    unsupported_specs = [spec for spec in iter_location_specs() if spec["model_domain"] is None]
+    if unsupported_specs:
+        unsupported_states = sorted({str(spec["state_label"]) for spec in unsupported_specs})
+        print(
+            "Skipping unsupported states for this HRRR CONUS workflow: " + ", ".join(unsupported_states),
+            flush=True,
+        )
 
     records = collect_records(args.date, args.max_forecast_hour, args.timeout, raw_dir)
     if not records:
