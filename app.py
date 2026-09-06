@@ -4,6 +4,7 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 import subprocess
+import sys
 import threading
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -40,15 +41,24 @@ def run_scripts(scripts: list[tuple[str, str]], max_parallel: int = 1) -> None:
         log_path = LOG_DIR / f"{Path(script_path).stem}_{log_stamp}.log"
         with semaphore:
             with log_path.open("w", encoding="utf-8") as log_file:
-                process = subprocess.run(
+                process = subprocess.Popen(
                     ["python", script_path],
                     cwd=working_dir,
-                    stdout=log_file,
                     stderr=subprocess.STDOUT,
                     text=True,
-                    check=False,
+                    stdout=subprocess.PIPE,
                 )
+                assert process.stdout is not None
+                for line in process.stdout:
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+                    log_file.write(line)
+                    log_file.flush()
+
+                process.wait()
                 log_file.write(f"\nExit code: {process.returncode}\n")
+                log_file.flush()
+                print(f"[{Path(script_path).name}] Exit code: {process.returncode}", flush=True)
 
     for script_path, working_dir in scripts:
         worker = threading.Thread(target=run_one, args=(script_path, working_dir), daemon=True)
@@ -192,8 +202,7 @@ def download_raw_grib_archive():
 def run_task1():
     scripts = [
         resolve_script_path(
-            "/opt/render/project/src/hrrr_dc_temp_grid.py",
-            "hrrr_dc_temp_grid.py",
+            "/opt/render/project/src/hrrr_dc_temp_grid.py","hrrr_dc_temp_grid.py",
         ),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, 1), daemon=True).start()

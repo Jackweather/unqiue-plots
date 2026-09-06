@@ -1,0 +1,222 @@
+{
+  "alabama__birmingham": {
+    "lat": 33.5206824,
+    "lon": -86.8024326
+  },
+  "alabama__huntsville": {
+    "lat": 34.729847,
+    "lon": -86.5859011
+  },
+  "alabama__mobile": {
+    "lat": 30.6913462,
+    "lon": -88.0437509
+  },
+  "alabama__montgomery": {
+    "lat": 32.3777111,
+    "lon": -86.3090775
+  },
+  "arizona__flagstaff": {
+    "lat": 35.1987522,
+    "lon": -111.651822
+  },
+  "arizona__kingman": {
+    "lat": 35.1895921,
+    "lon": -114.0532996
+  },
+  "arizona__phoenix": {
+    "lat": 33.4484367,
+    "lon": -112.074141
+  },
+  "arizona__tucson": {
+    "lat": 32.2228765,
+    "lon": -110.974847
+  },
+  "arkansas__fayetteville": {
+    "lat": 36.0625843,
+    "lon": -94.1574328
+  },
+  "arkansas__fort_smith": {
+    "lat": 35.3880338,
+    "lon": -94.4265011
+  },
+  "arkansas__jonesboro": {
+    "lat": 35.8348088,
+    "lon": -90.7045297
+  },
+  "arkansas__little_rock": {
+    "lat": 34.7465071,
+    "lon": -92.2896267
+  },
+  "california__los_angeles": {
+    "lat": 34.0536909,
+    "lon": -118.242766
+  },
+  "california__redding": {
+    "lat": 40.5863563,
+    "lon": -122.391675
+  },
+  "california__sacramento": {
+    "lat": 38.5810606,
+    "lon": -121.493895
+  },
+  "california__san_diego": {
+    "lat": 32.7174202,
+    "lon": -117.162772
+  },
+  "colorado__denver": {
+    "lat": 39.7392364,
+    "lon": -104.984862
+  },
+  "colorado__fort_collins": {
+    "lat": 40.5871782,
+    "lon": -105.0770113
+  },
+  "colorado__grand_junction": {
+    "lat": 39.0672568,
+    "lon": -108.56448
+  },
+  "colorado__pueblo": {
+    "lat": 38.263995,
+    "lon": -104.6141867
+  },
+  "connecticut__danbury": {
+    "lat": 41.394817,
+    "lon": -73.4540111
+  },
+  "connecticut__hartford": {
+    "lat": 41.764582,
+    "lon": -72.6908547
+  },
+  "connecticut__new_haven": {
+    "lat": 41.3082138,
+    "lon": -72.9250518
+  },
+  "connecticut__norwich": {
+    "lat": 41.5243631,
+    "lon": -72.0759134
+  },
+  "delaware__dover": {
+    "lat": 39.158168,
+    "lon": -75.5243682
+  },
+  "delaware__georgetown": {
+    "lat": 38.6900507,
+    "lon": -75.3858753
+  },
+  "delaware__rehoboth_beach": {
+    "lat": 38.7164771,
+    "lon": -75.0835107
+  },
+  "delaware__wilmington": {
+    "lat": 39.7459468,
+    "lon": -75.546589
+  },
+  "florida__jacksonville": {
+    "lat": 30.3262247,
+    "lon": -81.6579179
+  },
+  "florida__miami": {
+    "lat": 25.7741566,
+    "lon": -80.1935973
+  },
+  "florida__pensacola": {
+    "lat": 30.421309,
+    "lon": -87.2169149
+  },
+  "florida__tampa": {
+    "lat": 27.9449854,
+    "lon": -82.4583107
+  },
+  "georgia__atlanta": {
+    "lat": 33.7544657,
+    "lon": -84.3898151
+  },
+  "georgia__augusta": {
+    "lat": 33.4709714,
+    "lon": -81.9748429
+  },
+  "georgia__rome": {
+    "lat": 34.257038,
+    "lon": -85.1646726
+  },
+  "georgia__valdosta": {
+    "lat": 30.8327022,
+    "lon": -83.2784851
+  },
+  "idaho__boise": {
+    "lat": 43.6166163,
+    "lon": -116.200886
+  },
+  "idaho__coeur_dalene": {
+    "lat": 47.6742994,
+    "lon": -116.7811531
+  },
+  "idaho__idaho_falls": {
+    "lat": 43.4887907,
+    "lon": -112.03628
+  },
+  "idaho__lewiston": {
+    "lat": 46.4195913,
+    "lon": -117.0216144
+  },
+  "illinois__carbondale": {
+    "lat": 37.7274692,
+    "lon": -89.216655
+  },
+  "illinois__chicago": {
+    "lat": 41.8755616,
+    "lon": -87.6244212
+  },
+  "illinois__rockford": {
+    "lat": 42.2713945,
+    "lon": -89.093966
+  },
+  "illinois__springfield": {
+    "lat": 39.7990175,
+    "lon": -89.6439575
+  },
+  "indiana__evansville": {
+    "lat": 37.970495,
+    "lon": -87.5715641
+  },
+  "indiana__fort_wayne": {
+    "lat": 41.0799898,
+    "lon": -85.1386015
+  },
+  "indiana__gary": {
+    "lat": 41.6020962,
+    "lon": -87.3370646
+  },
+  "indiana__indianapolis": {
+    "lat": 39.7683331,
+    "lon": -86.1583502
+  },
+  "iowa__council_bluffs": {
+    "lat": 41.258841,
+    "lon": -95.8519484
+  },
+  "iowa__des_moines": {
+    "lat": 41.5868654,
+    "lon": -93.6249494
+  },
+  "iowa__dubuque": {
+    "lat": 42.5006243,
+    "lon": -90.6647985
+  },
+  "iowa__sioux_city": {
+    "lat": 42.4966815,
+    "lon": -96.4058782
+  },
+  "kansas__goodland": {
+    "lat": 39.350833,
+    "lon": -101.710172
+  },
+  "kansas__kansas_city": {
+    "lat": 39.1134562,
+    "lon": -94.626497
+  },
+  "kansas__wichita": {
+    "lat": 37.6922361,
+    "lon": -97.3375448
+  }
+}

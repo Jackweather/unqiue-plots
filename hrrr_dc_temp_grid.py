@@ -21,6 +21,7 @@ DEFAULT_DATE_FORMAT = "%Y%m%d"
 DEFAULT_OUTPUT_DIR = "/var/data/output"
 GEOCODE_CACHE_FILE = "location_coordinates.json"
 GEOCODER_URL = "https://nominatim.openstreetmap.org/search"
+LOCATIONS: dict[str, dict[str, str | float]] | None = None
 
 
 @dataclass(frozen=True)
@@ -100,6 +101,9 @@ def load_locations(base_dir: Path) -> dict[str, dict[str, str | float]]:
     cache = load_coordinate_cache(cache_path)
     geocode_session = requests.Session()
     locations: dict[str, dict[str, str | float]] = {}
+    geocoded_count = 0
+
+    print("Loading configured locations", flush=True)
 
     for spec in iter_location_specs():
         location_key = str(spec["location_key"])
@@ -108,9 +112,11 @@ def load_locations(base_dir: Path) -> dict[str, dict[str, str | float]]:
             continue
 
         if location_key not in cache:
+            print(f"  geocoding {spec['city_label']}, {spec['state_label']}", flush=True)
             lat, lon = geocode_location(geocode_session, str(spec["city_label"]), str(spec["state_label"]))
             cache[location_key] = {"lat": lat, "lon": lon}
             save_coordinate_cache(cache_path, cache)
+            geocoded_count += 1
             time.sleep(1)
 
         locations[location_key] = {
@@ -124,15 +130,25 @@ def load_locations(base_dir: Path) -> dict[str, dict[str, str | float]]:
             "lon": float(cache[location_key]["lon"]),
         }
 
+    print(
+        f"Loaded {len(locations)} HRRR-supported locations"
+        + (f" ({geocoded_count} newly geocoded)" if geocoded_count else ""),
+        flush=True,
+    )
     return locations
 
 
-LOCATIONS = load_locations(Path(__file__).resolve().parent)
+def get_locations() -> dict[str, dict[str, str | float]]:
+    global LOCATIONS
+    if LOCATIONS is None:
+        LOCATIONS = load_locations(Path(__file__).resolve().parent)
+    return LOCATIONS
 
 
 def build_url(date_str: str, cycle_hour: int, forecast_hour: int) -> str:
-    lats = [location["lat"] for location in LOCATIONS.values()]
-    lons = [location["lon"] for location in LOCATIONS.values()]
+    locations = get_locations()
+    lats = [location["lat"] for location in locations.values()]
+    lons = [location["lon"] for location in locations.values()]
     query = {
         "dir": f"/hrrr.{date_str}/conus",
         "file": f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.grib2",
@@ -230,12 +246,13 @@ def try_fetch_record(
 ) -> list[RunRecord]:
     run_time = datetime.strptime(f"{date_str}{cycle_hour:02d}", "%Y%m%d%H").replace(tzinfo=timezone.utc)
     records: list[RunRecord] = []
+    locations = get_locations()
     with xr.open_dataset(
         grib_file,
         engine="cfgrib",
         backend_kwargs={"indexpath": ""},
     ) as ds:
-        for location_key, location in LOCATIONS.items():
+        for location_key, location in locations.items():
             valid_time, temp_c = extract_temperature(ds, location["lat"], location["lon"])
             valid_time = valid_time.replace(tzinfo=timezone.utc) if valid_time.tzinfo is None else valid_time.astimezone(timezone.utc)
             temp_f = (temp_c * 9 / 5) + 32
@@ -320,7 +337,9 @@ def build_outputs(records: list[RunRecord], output_dir: Path, date_str: str) -> 
     tidy.to_csv(tidy_csv_path, index=False)
 
     output_paths: list[Path] = []
-    for location_key, location in LOCATIONS.items():
+    locations = get_locations()
+    print("Building CSV and plot outputs", flush=True)
+    for location_key, location in locations.items():
         location_rows = tidy[tidy["location_key"] == location_key]
         if location_rows.empty:
             continue
@@ -338,6 +357,7 @@ def build_outputs(records: list[RunRecord], output_dir: Path, date_str: str) -> 
         csv_path = state_csv_dir / f"hrrr_{city_key}_temp_grid_{date_str}.csv"
         png_path = state_plot_dir / f"hrrr_{city_key}_temp_grid_{date_str}.png"
         grid.to_csv(csv_path)
+        print(f"  writing plot for {location['label']}", flush=True)
         write_heatmap(grid, png_path, date_str, location["label"])
         output_paths.extend([csv_path, png_path])
 
@@ -374,6 +394,10 @@ def main() -> None:
     args = parse_args()
     output_dir = Path(args.output_dir)
     raw_dir = output_dir / args.date / "raw_grib"
+
+    print(f"Starting HRRR temperature grid run for {args.date}", flush=True)
+    print(f"Output directory: {output_dir}", flush=True)
+    get_locations()
 
     unsupported_specs = [spec for spec in iter_location_specs() if spec["model_domain"] is None]
     if unsupported_specs:
