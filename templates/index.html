@@ -205,7 +205,7 @@
     <main class="shell">
         <section class="hero">
             <h1>HRRR Plot Viewer</h1>
-            <p>Browse saved HRRR 2 m temperature plots by date and state. New day folders appear automatically when your download script writes them.</p>
+            <p>Browse saved HRRR 2 m temperature plots for New York, Maryland, New Jersey, Connecticut, Maine, Massachusetts, and Vermont. New day folders appear automatically when your download script writes them.</p>
 
             <form class="toolbar" method="get">
                 <label for="date">Date</label>
@@ -233,7 +233,7 @@
             {% endif %}
 
             {% if selected_state %}
-            <div class="state-note">Viewing state: {{ selected_state_label }}. Alaska and Hawaii are listed, but this version only generates plots for the current HRRR CONUS coverage.</div>
+            <div class="state-note">Viewing state: {{ selected_state_label }}. This workflow is currently limited to the Northeast state set shown in the selector.</div>
             {% endif %}
 
             {% if downloadable_dates %}

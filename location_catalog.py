@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+ENABLED_STATE_KEYS = (
+    "new_york",
+    "maryland",
+    "new_jersey",
+    "connecticut",
+    "maine",
+    "massachusetts",
+    "vermont",
+)
+
 STATE_CITY_GROUPS = {
     "alabama": {
         "label": "Alabama",
@@ -254,6 +264,14 @@ STATE_CITY_GROUPS = {
 }
 
 
+def get_enabled_state_groups() -> dict[str, dict[str, str | None | list[tuple[str, str, str]]]]:
+    return {
+        state_key: STATE_CITY_GROUPS[state_key]
+        for state_key in ENABLED_STATE_KEYS
+        if state_key in STATE_CITY_GROUPS
+    }
+
+
 def get_state_options() -> list[dict[str, str | bool | None]]:
     return [
         {
@@ -262,13 +280,13 @@ def get_state_options() -> list[dict[str, str | bool | None]]:
             "model_domain": state_data["model_domain"],
             "supported": state_data["model_domain"] is not None,
         }
-        for state_key, state_data in STATE_CITY_GROUPS.items()
+        for state_key, state_data in get_enabled_state_groups().items()
     ]
 
 
 def iter_location_specs(max_locations_per_state: int | None = None) -> list[dict[str, str | None]]:
     locations: list[dict[str, str | None]] = []
-    for state_key, state_data in STATE_CITY_GROUPS.items():
+    for state_key, state_data in get_enabled_state_groups().items():
         cities = state_data["cities"]
         if max_locations_per_state is not None and max_locations_per_state > 0:
             cities = cities[:max_locations_per_state]

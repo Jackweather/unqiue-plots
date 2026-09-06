@@ -14,360 +14,120 @@
   "alabama__montgomery": {
     "lat": 32.3777111,
     "lon": -86.3090775
-  },
-  "arizona__flagstaff": {
-    "lat": 35.1987522,
-    "lon": -111.651822
-  },
-  "arizona__kingman": {
-    "lat": 35.1895921,
-    "lon": -114.0532996
-  },
-  "arizona__phoenix": {
-    "lat": 33.4484367,
-    "lon": -112.074141
-  },
-  "arizona__tucson": {
-    "lat": 32.2228765,
-    "lon": -110.974847
-  },
-  "arkansas__fayetteville": {
-    "lat": 36.0625843,
-    "lon": -94.1574328
-  },
-  "arkansas__fort_smith": {
-    "lat": 35.3880338,
-    "lon": -94.4265011
-  },
-  "arkansas__jonesboro": {
-    "lat": 35.8348088,
-    "lon": -90.7045297
-  },
-  "arkansas__little_rock": {
-    "lat": 34.7465071,
-    "lon": -92.2896267
-  },
-  "california__los_angeles": {
-    "lat": 34.0536909,
-    "lon": -118.242766
-  },
-  "california__redding": {
-    "lat": 40.5863563,
-    "lon": -122.391675
-  },
-  "california__sacramento": {
-    "lat": 38.5810606,
-    "lon": -121.493895
-  },
-  "california__san_diego": {
-    "lat": 32.7174202,
-    "lon": -117.162772
-  },
-  "colorado__denver": {
-    "lat": 39.7392364,
-    "lon": -104.984862
-  },
-  "colorado__fort_collins": {
-    "lat": 40.5871782,
-    "lon": -105.0770113
-  },
-  "colorado__grand_junction": {
-    "lat": 39.0672568,
-    "lon": -108.56448
-  },
-  "colorado__pueblo": {
-    "lat": 38.263995,
-    "lon": -104.6141867
-  },
-  "connecticut__danbury": {
-    "lat": 41.394817,
-    "lon": -73.4540111
-  },
-  "connecticut__hartford": {
-    "lat": 41.764582,
-    "lon": -72.6908547
-  },
-  "connecticut__new_haven": {
-    "lat": 41.3082138,
-    "lon": -72.9250518
-  },
-  "connecticut__norwich": {
-    "lat": 41.5243631,
-    "lon": -72.0759134
-  },
-  "delaware__dover": {
-    "lat": 39.158168,
-    "lon": -75.5243682
-  },
-  "delaware__georgetown": {
-    "lat": 38.6900507,
-    "lon": -75.3858753
-  },
-  "delaware__rehoboth_beach": {
-    "lat": 38.7164771,
-    "lon": -75.0835107
-  },
-  "delaware__wilmington": {
-    "lat": 39.7459468,
-    "lon": -75.546589
-  },
-  "florida__jacksonville": {
-    "lat": 30.3262247,
-    "lon": -81.6579179
-  },
-  "florida__miami": {
-    "lat": 25.7741566,
-    "lon": -80.1935973
-  },
-  "florida__pensacola": {
-    "lat": 30.421309,
-    "lon": -87.2169149
-  },
-  "florida__tampa": {
-    "lat": 27.9449854,
-    "lon": -82.4583107
-  },
-  "georgia__atlanta": {
-    "lat": 33.7544657,
-    "lon": -84.3898151
-  },
-  "georgia__augusta": {
-    "lat": 33.4709714,
-    "lon": -81.9748429
-  },
-  "georgia__rome": {
-    "lat": 34.257038,
-    "lon": -85.1646726
-  },
-  "georgia__valdosta": {
-    "lat": 30.8327022,
-    "lon": -83.2784851
-  },
-  "idaho__boise": {
-    "lat": 43.6166163,
-    "lon": -116.200886
-  },
-  "idaho__coeur_dalene": {
-    "lat": 47.6742994,
-    "lon": -116.7811531
-  },
-  "idaho__idaho_falls": {
-    "lat": 43.4887907,
-    "lon": -112.03628
-  },
-  "idaho__lewiston": {
-    "lat": 46.4195913,
-    "lon": -117.0216144
-  },
-  "illinois__carbondale": {
-    "lat": 37.7274692,
-    "lon": -89.216655
-  },
-  "illinois__chicago": {
-    "lat": 41.8755616,
-    "lon": -87.6244212
-  },
-  "illinois__rockford": {
-    "lat": 42.2713945,
-    "lon": -89.093966
-  },
-  "illinois__springfield": {
-    "lat": 39.7990175,
-    "lon": -89.6439575
-  },
-  "indiana__evansville": {
-    "lat": 37.970495,
-    "lon": -87.5715641
-  },
-  "indiana__fort_wayne": {
-    "lat": 41.0799898,
-    "lon": -85.1386015
-  },
-  "indiana__gary": {
-    "lat": 41.6020962,
-    "lon": -87.3370646
-  },
-  "indiana__indianapolis": {
-    "lat": 39.7683331,
-    "lon": -86.1583502
-  },
-  "iowa__council_bluffs": {
-    "lat": 41.258841,
-    "lon": -95.8519484
-  },
-  "iowa__des_moines": {
-    "lat": 41.5868654,
-    "lon": -93.6249494
-  },
-  "iowa__dubuque": {
-    "lat": 42.5006243,
-    "lon": -90.6647985
-  },
-  "iowa__sioux_city": {
-    "lat": 42.4966815,
-    "lon": -96.4058782
-  },
-  "kansas__dodge_city": {
-    "lat": 37.7527982,
-    "lon": -100.0170787
-  },
-  "kansas__goodland": {
-    "lat": 39.350833,
-    "lon": -101.710172
-  },
-  "kansas__kansas_city": {
-    "lat": 39.1134562,
-    "lon": -94.626497
-  },
-  "kansas__wichita": {
-    "lat": 37.6922361,
-    "lon": -97.3375448
-  },
-  "kentucky__lexington": {
-    "lat": 38.0464066,
-    "lon": -84.4970393
-  },
-  "kentucky__louisville": {
-    "lat": 38.2542376,
-    "lon": -85.759407
-  },
-  "kentucky__paducah": {
-    "lat": 37.0833893,
-    "lon": -88.6000478
-  },
-  "kentucky__pikeville": {
-    "lat": 37.4792672,
-    "lon": -82.5187629
-  },
-  "louisiana__baton_rouge": {
-    "lat": 30.4494155,
-    "lon": -91.1869659
-  },
-  "louisiana__monroe": {
-    "lat": 32.5025471,
-    "lon": -92.116219
-  },
-  "louisiana__new_orleans": {
-    "lat": 29.9561422,
-    "lon": -90.0733934
-  },
-  "louisiana__shreveport": {
-    "lat": 32.5135356,
-    "lon": -93.7477839
-  },
-  "maine__bangor": {
-    "lat": 44.8016255,
-    "lon": -68.7713289
-  },
-  "maine__fort_kent": {
-    "lat": 47.2559046,
-    "lon": -68.5904597
-  },
-  "maine__portland": {
-    "lat": 43.6573605,
-    "lon": -70.2586618
-  },
-  "maine__presque_isle": {
-    "lat": 46.681153,
-    "lon": -68.0158615
-  },
-  "maryland__baltimore": {
-    "lat": 39.2908816,
-    "lon": -76.610759
-  },
-  "maryland__cumberland": {
-    "lat": 39.6526498,
-    "lon": -78.762383
-  },
-  "maryland__hagerstown": {
-    "lat": 39.6430455,
-    "lon": -77.7191081
-  },
-  "maryland__salisbury": {
-    "lat": 38.366027,
-    "lon": -75.6009964
-  },
-  "massachusetts__boston": {
-    "lat": 42.3588336,
-    "lon": -71.0578303
-  },
-  "massachusetts__new_bedford": {
-    "lat": 41.6362152,
-    "lon": -70.934205
-  },
-  "massachusetts__pittsfield": {
-    "lat": 42.4484778,
-    "lon": -73.2541069
-  },
-  "massachusetts__worcester": {
-    "lat": 42.2625621,
-    "lon": -71.8018877
-  },
-  "michigan__detroit": {
-    "lat": 42.3315509,
-    "lon": -83.0466403
-  },
-  "michigan__grand_rapids": {
-    "lat": 42.9632425,
-    "lon": -85.6678639
-  },
-  "michigan__ironwood": {
-    "lat": 46.4555673,
-    "lon": -90.1684371
-  },
-  "michigan__sault_ste_marie": {
-    "lat": 46.4976734,
-    "lon": -84.3476583
-  },
-  "minnesota__duluth": {
-    "lat": 46.7838287,
-    "lon": -92.1052679
-  },
-  "minnesota__minneapolis": {
-    "lat": 44.9772995,
-    "lon": -93.2654692
-  },
-  "minnesota__moorhead": {
-    "lat": 46.8739081,
-    "lon": -96.7538674
-  },
-  "minnesota__rochester": {
-    "lat": 44.0234387,
-    "lon": -92.4630182
-  },
-  "mississippi__clarksdale": {
-    "lat": 34.2006479,
-    "lon": -90.5702071
-  },
-  "mississippi__gulfport": {
-    "lat": 30.3674198,
-    "lon": -89.0928155
-  },
-  "mississippi__jackson": {
-    "lat": 32.2998686,
-    "lon": -90.1830408
-  },
-  "mississippi__meridian": {
-    "lat": 32.3643098,
-    "lon": -88.703656
-  },
-  "missouri__kansas_city": {
-    "lat": 39.100105,
-    "lon": -94.5781416
-  },
-  "missouri__springfield": {
-    "lat": 37.2081729,
-    "lon": -93.2922715
-  },
-  "missouri__st_joseph": {
-    "lat": 39.7686055,
-    "lon": -94.8466322
-  },
-  "missouri__st_louis": {
-    "lat": 38.6254063,
-    "lon": -90.190009
-  },
-  "montana__billings": {
+  {
+    "connecticut__danbury": {
+      "lat": 41.394817,
+      "lon": -73.4540111
+    },
+    "connecticut__hartford": {
+      "lat": 41.764582,
+      "lon": -72.6908547
+    },
+    "connecticut__new_haven": {
+      "lat": 41.3082138,
+      "lon": -72.9250518
+    },
+    "connecticut__norwich": {
+      "lat": 41.5243631,
+      "lon": -72.0759134
+    },
+    "maine__bangor": {
+      "lat": 44.8016255,
+      "lon": -68.7713289
+    },
+    "maine__fort_kent": {
+      "lat": 47.2559046,
+      "lon": -68.5904597
+    },
+    "maine__portland": {
+      "lat": 43.6573605,
+      "lon": -70.2586618
+    },
+    "maine__presque_isle": {
+      "lat": 46.681153,
+      "lon": -68.0158615
+    },
+    "maryland__baltimore": {
+      "lat": 39.2908816,
+      "lon": -76.610759
+    },
+    "maryland__cumberland": {
+      "lat": 39.6526498,
+      "lon": -78.762383
+    },
+    "maryland__hagerstown": {
+      "lat": 39.6430455,
+      "lon": -77.7191081
+    },
+    "maryland__salisbury": {
+      "lat": 38.366027,
+      "lon": -75.6009964
+    },
+    "massachusetts__boston": {
+      "lat": 42.3588336,
+      "lon": -71.0578303
+    },
+    "massachusetts__new_bedford": {
+      "lat": 41.6362152,
+      "lon": -70.934205
+    },
+    "massachusetts__pittsfield": {
+      "lat": 42.4484778,
+      "lon": -73.2541069
+    },
+    "massachusetts__worcester": {
+      "lat": 42.2625621,
+      "lon": -71.8018877
+    },
+    "new_jersey__cape_may": {
+      "lat": 39.1765386,
+      "lon": -74.8012119
+    },
+    "new_jersey__newark": {
+      "lat": 40.735657,
+      "lon": -74.1723667
+    },
+    "new_jersey__sussex": {
+      "lat": 41.133372,
+      "lon": -74.6930393
+    },
+    "new_jersey__trenton": {
+      "lat": 40.2203074,
+      "lon": -74.7659
+    },
+    "new_york__albany": {
+      "lat": 42.6511674,
+      "lon": -73.754968
+    },
+    "new_york__buffalo": {
+      "lat": 42.8864163,
+      "lon": -78.8781493
+    },
+    "new_york__new_york_city": {
+      "lat": 40.7127281,
+      "lon": -74.0060152
+    },
+    "new_york__syracuse": {
+      "lat": 43.0481221,
+      "lon": -76.1474244
+    },
+    "vermont__brattleboro": {
+      "lat": 42.8507588,
+      "lon": -72.5572913
+    },
+    "vermont__burlington": {
+      "lat": 44.4761601,
+      "lon": -73.212906
+    },
+    "vermont__newport": {
+      "lat": 44.9367172,
+      "lon": -72.2055988
+    },
+    "vermont__st_albans": {
+      "lat": 44.8107911,
+      "lon": -73.0833607
+    }
+  }
     "lat": 45.7874957,
     "lon": -108.49607
   },
