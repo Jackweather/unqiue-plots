@@ -201,20 +201,13 @@ def download_raw_grib_archive():
 @app.route("/run-task1")
 def run_task1():
     scripts = [
-        resolve_script_path("/opt/render/project/src/hrrr_dc_temp_grid.py","hrrr_dc_temp_grid.py"),
-    ]
-    threading.Thread(target=lambda: run_scripts(scripts, 1), daemon=True).start()
-    return f"Task started in background! Check {LOG_DIR} for output.", 200
-
-
-@app.route("/run-task1")
-def run_task2():
-    scripts = [
         ("/opt/render/project/src/hrrr_dc_temp_grid.py", "hrrr_dc_temp_grid.py"),
         # Add more GFS scripts here as needed
     ]
-    threading.Thread(target=lambda: run_scripts(scripts, 2)).start()
-    return "Task 2 started in background! Check logs folder for output.", 200
+    threading.Thread(target=lambda: run_scripts(scripts, 1)).start()
+    return "Task 1 started in background! Check logs folder for output.", 200
+
+
 
 
 if __name__ == "__main__":
