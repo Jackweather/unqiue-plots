@@ -106,6 +106,35 @@ def get_plot_entries(date_dir: Path, state_key: str | None) -> list[dict[str, st
     return entries
 
 
+def get_usa_trend_entries(date_dir: Path | None) -> list[dict[str, str]]:
+    if date_dir is None:
+        return []
+
+    plot_dir = date_dir / "plots" / "usa_temp_trend"
+    if not plot_dir.exists():
+        return []
+
+    entries: list[dict[str, str]] = []
+    for plot_path in sorted(plot_dir.glob("*.png")):
+        stem_parts = plot_path.stem.split("_")
+        if len(stem_parts) >= 7:
+            run_token = stem_parts[-2]
+            forecast_token = stem_parts[-1]
+            label = f"Run {run_token.upper()} | Forecast {forecast_token.upper()}"
+        else:
+            label = plot_path.stem.replace("_", " ").title()
+
+        entries.append(
+            {
+                "name": plot_path.name,
+                "label": label,
+                "url": f"/usa-trend-plots/{date_dir.name}/{plot_path.name}",
+            }
+        )
+
+    return entries
+
+
 def get_raw_grib_dir(date_str: str) -> Path:
     return OUTPUT_DIR / date_str / "raw_grib"
 
@@ -176,6 +205,14 @@ def serve_plot(date_str: str, state_key: str, filename: str):
     return send_from_directory(plot_dir, filename)
 
 
+@app.route("/usa-trend-plots/<date_str>/<filename>")
+def serve_usa_trend_plot(date_str: str, filename: str):
+    plot_dir = OUTPUT_DIR / date_str / "plots" / "usa_temp_trend"
+    if not plot_dir.exists():
+        abort(404)
+    return send_from_directory(plot_dir, filename)
+
+
 @app.route("/downloads/raw-grib.zip")
 def download_raw_grib_archive():
     date_dirs = get_date_directories()
@@ -195,6 +232,25 @@ def download_raw_grib_archive():
         mimetype="application/zip",
         as_attachment=True,
         download_name=download_name,
+    )
+
+
+@app.route("/usa-trends")
+def usa_trends() -> str:
+    date_dirs = get_date_directories()
+    requested_date = request.args.get("date")
+    selected_dir = next((path for path in date_dirs if path.name == requested_date), None)
+    if selected_dir is None and date_dirs:
+        selected_dir = date_dirs[0]
+
+    selected_date = selected_dir.name if selected_dir else None
+    trend_plots = get_usa_trend_entries(selected_dir)
+
+    return render_template(
+        "usa_trends.html",
+        available_dates=[path.name for path in date_dirs],
+        selected_date=selected_date,
+        trend_plots=trend_plots,
     )
 
 
