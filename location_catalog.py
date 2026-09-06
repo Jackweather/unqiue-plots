@@ -266,10 +266,13 @@ def get_state_options() -> list[dict[str, str | bool | None]]:
     ]
 
 
-def iter_location_specs() -> list[dict[str, str | None]]:
+def iter_location_specs(max_locations_per_state: int | None = None) -> list[dict[str, str | None]]:
     locations: list[dict[str, str | None]] = []
     for state_key, state_data in STATE_CITY_GROUPS.items():
-        for city_key, city_label, region_label in state_data["cities"]:
+        cities = state_data["cities"]
+        if max_locations_per_state is not None and max_locations_per_state > 0:
+            cities = cities[:max_locations_per_state]
+        for city_key, city_label, region_label in cities:
             locations.append(
                 {
                     "location_key": f"{state_key}__{city_key}",
