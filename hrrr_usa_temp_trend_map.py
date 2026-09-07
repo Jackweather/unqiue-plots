@@ -252,9 +252,17 @@ def collect_forecast_trend(
         return None
 
     prior_fields: list[np.ndarray] = []
-    comparison_cycle_hours: list[int] = []
+    comparison_labels: list[str] = []
     for previous_cycle_hour in range(0, cycle_hour):
-        previous_field = get_temperature_field(session, date_str, previous_cycle_hour, forecast_hour, timeout, raw_dir)
+        previous_forecast_hour = forecast_hour + (cycle_hour - previous_cycle_hour)
+        previous_field = get_temperature_field(
+            session,
+            date_str,
+            previous_cycle_hour,
+            previous_forecast_hour,
+            timeout,
+            raw_dir,
+        )
         if previous_field is None:
             continue
 
@@ -265,7 +273,7 @@ def collect_forecast_trend(
             continue
 
         prior_fields.append(previous_temp_f)
-        comparison_cycle_hours.append(previous_cycle_hour)
+        comparison_labels.append(f"{previous_cycle_hour:02d}z f{previous_forecast_hour:02d}")
 
     if not prior_fields:
         return None
@@ -280,7 +288,7 @@ def collect_forecast_trend(
     smoothed = smooth_field(grouped_delta, smoothing_sigma)
     return ForecastTrend(
         cycle_hour=cycle_hour,
-        comparison_cycle_hours=comparison_cycle_hours,
+        comparison_cycle_hours=comparison_labels,
         forecast_hour=forecast_hour,
         valid_time=valid_time,
         field_f=smoothed,
@@ -301,7 +309,7 @@ def prefetch_temperature_fields(
     print("Downloading HRRR fields before plotting", flush=True)
     for cycle_hour in range(0, latest_cycle + 1):
         print(f"Prefetching run {cycle_hour:02d}z", flush=True)
-        for forecast_hour in range(0, max_forecast_hour + 1):
+        for forecast_hour in range(0, max_forecast_hour + latest_cycle + 1):
             load_or_download_grib(session, date_str, cycle_hour, forecast_hour, timeout, raw_dir)
         clear_field_cache()
 
@@ -343,7 +351,7 @@ def draw_trend_map(trend: ForecastTrend, output_path: Path, date_str: str) -> No
         transform=ccrs.PlateCarree(),
     )
 
-    compared = " ".join(f"{hour:02d}z" for hour in trend.comparison_cycle_hours)
+    compared = ", ".join(trend.comparison_cycle_hours)
     ax.set_title(
         "HRRR Smoothed 2 m Temperature Change\n"
         f"{date_str} run {trend.cycle_hour:02d}z forecast f{trend.forecast_hour:02d} versus {compared} | "
