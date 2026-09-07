@@ -261,6 +261,10 @@ def run_task1():
             "/opt/render/project/src/hrrr_dc_temp_grid.py",
             "hrrr_dc_temp_grid.py",
         ),
+        resolve_script_path(
+            "/opt/render/project/src/hrrr_usa_temp_trend_map.py",
+            "hrrr_usa_temp_trend_map.py",
+        ),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, 1), daemon=True).start()
     return f"Task started in background! Check {LOG_DIR} for output.", 200
