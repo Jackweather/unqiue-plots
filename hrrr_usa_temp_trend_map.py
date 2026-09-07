@@ -351,10 +351,9 @@ def draw_trend_map(trend: ForecastTrend, output_path: Path, date_str: str) -> No
         transform=ccrs.PlateCarree(),
     )
 
-    compared = ", ".join(trend.comparison_cycle_hours)
     ax.set_title(
         "HRRR Smoothed 2 m Temperature Change\n"
-        f"{date_str} run {trend.cycle_hour:02d}z forecast f{trend.forecast_hour:02d} versus {compared} | "
+        f"{date_str} run {trend.cycle_hour:02d}z forecast f{trend.forecast_hour:02d} | "
         f"valid {trend.valid_time:%m-%d %HZ}",
         fontsize=16,
         pad=16,
