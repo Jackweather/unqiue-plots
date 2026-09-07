@@ -237,6 +237,7 @@ def collect_forecast_trend(
     date_str: str,
     cycle_hour: int,
     forecast_hour: int,
+    max_forecast_hour: int,
     timeout: int,
     raw_dir: Path,
     smoothing_sigma: float,
@@ -255,6 +256,8 @@ def collect_forecast_trend(
     comparison_labels: list[str] = []
     for previous_cycle_hour in range(0, cycle_hour):
         previous_forecast_hour = forecast_hour + (cycle_hour - previous_cycle_hour)
+        if previous_forecast_hour > max_forecast_hour:
+            continue
         previous_field = get_temperature_field(
             session,
             date_str,
@@ -309,7 +312,7 @@ def prefetch_temperature_fields(
     print("Downloading HRRR fields before plotting", flush=True)
     for cycle_hour in range(0, latest_cycle + 1):
         print(f"Prefetching run {cycle_hour:02d}z", flush=True)
-        for forecast_hour in range(0, max_forecast_hour + latest_cycle + 1):
+        for forecast_hour in range(0, max_forecast_hour + 1):
             load_or_download_grib(session, date_str, cycle_hour, forecast_hour, timeout, raw_dir)
         clear_field_cache()
 
@@ -418,6 +421,7 @@ def main() -> None:
                 date_str=args.date,
                 cycle_hour=cycle_hour,
                 forecast_hour=forecast_hour,
+                max_forecast_hour=args.max_forecast_hour,
                 timeout=args.timeout,
                 raw_dir=raw_dir,
                 smoothing_sigma=args.smoothing_sigma,
