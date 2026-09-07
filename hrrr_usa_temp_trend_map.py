@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -185,6 +186,11 @@ def get_temperature_field(
     return field
 
 
+def clear_field_cache() -> None:
+    FIELD_CACHE.clear()
+    gc.collect()
+
+
 def smooth_field(field: np.ndarray, sigma: float) -> np.ndarray:
     mask = np.isfinite(field)
     if not np.any(mask):
@@ -296,7 +302,8 @@ def prefetch_temperature_fields(
     for cycle_hour in range(0, latest_cycle + 1):
         print(f"Prefetching run {cycle_hour:02d}z", flush=True)
         for forecast_hour in range(0, max_forecast_hour + 1):
-            get_temperature_field(session, date_str, cycle_hour, forecast_hour, timeout, raw_dir)
+            load_or_download_grib(session, date_str, cycle_hour, forecast_hour, timeout, raw_dir)
+        clear_field_cache()
 
 
 def draw_trend_map(trend: ForecastTrend, output_path: Path, date_str: str) -> None:
@@ -420,6 +427,9 @@ def main() -> None:
             draw_trend_map(trend, output_path, args.date)
             print(f"Saved output: {output_path}", flush=True)
             saved_maps += 1
+            clear_field_cache()
+
+        clear_field_cache()
 
     if saved_maps == 0:
         raise SystemExit("No comparable HRRR runs were available for the requested date.")
