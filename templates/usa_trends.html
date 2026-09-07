@@ -30,32 +30,32 @@
         }
 
         .shell {
-            width: min(1280px, calc(100% - 32px));
-            margin: 24px auto;
+            width: min(1180px, calc(100% - 24px));
+            margin: 14px auto;
         }
 
         .hero {
             background: color-mix(in srgb, var(--panel) 92%, white 8%);
             border: 1px solid var(--line);
             border-radius: 20px;
-            padding: 24px;
+            padding: 16px 18px;
             box-shadow: 0 20px 40px rgba(31, 42, 46, 0.08);
         }
 
         h1 {
             margin: 0 0 8px;
-            font-size: clamp(2rem, 4vw, 3.1rem);
+            font-size: clamp(1.5rem, 3vw, 2.35rem);
             line-height: 1;
         }
 
         p {
             margin: 0;
             color: var(--muted);
-            font-size: 1rem;
+            font-size: 0.92rem;
         }
 
         .toolbar {
-            margin-top: 18px;
+            margin-top: 12px;
             display: flex;
             gap: 12px;
             align-items: center;
@@ -71,7 +71,7 @@
         .home-link {
             border-radius: 12px;
             border: 1px solid var(--line);
-            padding: 10px 14px;
+            padding: 8px 12px;
             font: inherit;
         }
 
@@ -91,7 +91,7 @@
         }
 
         .grid {
-            margin-top: 22px;
+            margin-top: 14px;
             display: grid;
             gap: 20px;
         }
@@ -105,18 +105,18 @@
         }
 
         .card header {
-            padding: 14px 16px;
+            padding: 10px 14px;
             background: var(--accent-soft);
             border-bottom: 1px solid var(--line);
         }
 
         .card h2 {
             margin: 0;
-            font-size: 1.05rem;
+            font-size: 0.98rem;
         }
 
         .viewer-body {
-            padding: 18px;
+            padding: 12px;
         }
 
         .viewer-frame {
@@ -125,19 +125,22 @@
             overflow: hidden;
             border: 1px solid var(--line);
             background: white;
+            max-width: 920px;
+            margin: 0 auto;
         }
 
         .card img {
             display: block;
             width: 100%;
-            height: auto;
+            max-height: 62vh;
+            object-fit: contain;
             background: white;
         }
 
         .slider-panel {
-            margin-top: 16px;
+            margin-top: 10px;
             display: grid;
-            gap: 10px;
+            gap: 8px;
         }
 
         .slider-meta {
@@ -158,6 +161,37 @@
             accent-color: var(--accent);
         }
 
+        .viewer-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .control-group {
+            display: grid;
+            gap: 6px;
+            min-width: min(280px, 100%);
+        }
+
+        .viewer-status {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .control-group select {
+            width: 100%;
+            background: white;
+        }
+
+        @media (max-width: 720px) {
+            .card img {
+                max-height: 48vh;
+            }
+        }
+
         .empty {
             margin-top: 22px;
             padding: 22px;
@@ -171,7 +205,7 @@
     <main class="shell">
         <section class="hero">
             <h1>USA Temperature Trend Maps</h1>
-            <p>Browse smoothed HRRR USA maps by date. Each image shows either the 00z baseline field or how a newer run changed compared with earlier runs for the same forecast hour.</p>
+            <p>Browse USA trend maps by date. The page starts on the most recent run, and you can switch to older runs with the dropdown.</p>
 
             <form class="toolbar" method="get">
                 <label for="date">Date</label>
@@ -193,6 +227,13 @@
                     <h2 id="plot-title">{{ first_plot.label }}</h2>
                 </header>
                 <div class="viewer-body">
+                    <div class="viewer-controls">
+                        <div class="control-group">
+                            <label for="run-select">Run</label>
+                            <select id="run-select" aria-label="Select model run"></select>
+                        </div>
+                        <div id="viewer-status" class="viewer-status"></div>
+                    </div>
                     <a id="plot-link" class="viewer-frame" href="{{ first_plot.url }}" target="_blank" rel="noreferrer">
                         <img id="plot-image" src="{{ first_plot.url }}" alt="{{ first_plot.label }}">
                     </a>
@@ -214,23 +255,75 @@
             const counter = document.getElementById("plot-counter");
             const link = document.getElementById("plot-link");
             const image = document.getElementById("plot-image");
+            const runSelect = document.getElementById("run-select");
+            const viewerStatus = document.getElementById("viewer-status");
+
+            const getRunLabel = (plot) => {
+                const match = plot.label.match(/Run\s+([^|]+)/i);
+                return match ? `Run ${match[1].trim()}` : "All Runs";
+            };
+
+            const runOrderValue = (runLabel) => {
+                const match = runLabel.match(/(\d{2})Z/i);
+                return match ? Number(match[1]) : -1;
+            };
+
+            const plotsByRun = new Map();
+            for (const plot of trendPlots) {
+                const runLabel = getRunLabel(plot);
+                if (!plotsByRun.has(runLabel)) {
+                    plotsByRun.set(runLabel, []);
+                }
+                plotsByRun.get(runLabel).push(plot);
+            }
+
+            const availableRuns = Array.from(plotsByRun.keys()).sort((left, right) => runOrderValue(right) - runOrderValue(left));
+            let activePlots = plotsByRun.get(availableRuns[0]) ?? trendPlots;
+
+            const updateSliderBounds = () => {
+                slider.min = "0";
+                slider.max = String(Math.max(activePlots.length - 1, 0));
+                slider.value = "0";
+                slider.disabled = activePlots.length <= 1;
+            };
 
             const renderPlot = (index) => {
-                const plot = trendPlots[index];
+                const plot = activePlots[index];
                 if (!plot) {
                     return;
                 }
 
                 title.textContent = plot.label;
-                counter.textContent = `${index + 1} / ${trendPlots.length}`;
+                counter.textContent = `${index + 1} / ${activePlots.length}`;
+                viewerStatus.textContent = `Showing ${runSelect.value}`;
                 link.href = plot.url;
                 image.src = plot.url;
                 image.alt = plot.label;
             };
 
+            for (const runLabel of availableRuns) {
+                const option = document.createElement("option");
+                option.value = runLabel;
+                option.textContent = runLabel;
+                runSelect.append(option);
+            }
+
+            if (availableRuns.length > 0) {
+                runSelect.value = availableRuns[0];
+            }
+
+            runSelect.addEventListener("change", (event) => {
+                activePlots = plotsByRun.get(event.target.value) ?? trendPlots;
+                updateSliderBounds();
+                renderPlot(0);
+            });
+
             slider.addEventListener("input", (event) => {
                 renderPlot(Number(event.target.value));
             });
+
+            updateSliderBounds();
+            renderPlot(0);
         </script>
         {% else %}
         <section class="empty">
