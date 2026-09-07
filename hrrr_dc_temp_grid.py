@@ -20,6 +20,7 @@ NOMADS_FILTER_URL = "https://nomads.ncep.noaa.gov/cgi-bin/filter_hrrr_2d.pl"
 DEFAULT_DATE_FORMAT = "%Y%m%d"
 DEFAULT_OUTPUT_DIR = "/var/data/output"
 DEFAULT_CACHE_DIR = "/var/data"
+DEFAULT_MAX_FORECAST_HOUR = 18
 DEFAULT_MAX_LOCATIONS_PER_STATE = 1
 GEOCODE_CACHE_FILE = "location_coordinates.json"
 GEOCODER_URL = "https://nominatim.openstreetmap.org/search"
@@ -66,7 +67,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-forecast-hour",
         type=int,
-        default=18,
+        default=DEFAULT_MAX_FORECAST_HOUR,
         help="Largest forecast hour to try for each run. Default is 18 for each model run.",
     )
     parser.add_argument(
@@ -347,6 +348,7 @@ def collect_records(date_str: str, max_forecast_hour: int, timeout: int, raw_dir
     target_date = datetime.strptime(date_str, DEFAULT_DATE_FORMAT).replace(tzinfo=timezone.utc)
     now_utc = datetime.now(timezone.utc)
     latest_cycle = 23 if target_date.date() < now_utc.date() else now_utc.hour
+    effective_max_forecast_hour = min(max_forecast_hour, DEFAULT_MAX_FORECAST_HOUR)
     session = requests.Session()
     session.headers.update({"User-Agent": "hrrr-dc-temp-grid/1.0"})
 
@@ -355,7 +357,7 @@ def collect_records(date_str: str, max_forecast_hour: int, timeout: int, raw_dir
         print(f"Checking run {cycle_hour:02d}z", flush=True)
         cycle_records: list[RunRecord] = []
         miss_streak = 0
-        for forecast_hour in range(0, max_forecast_hour + 1):
+        for forecast_hour in range(0, effective_max_forecast_hour + 1):
             grib_file = load_or_download_grib(session, date_str, cycle_hour, forecast_hour, timeout, raw_dir)
             if grib_file is None:
                 print(f"  no data for {cycle_hour:02d}z f{forecast_hour:02d}", flush=True)
