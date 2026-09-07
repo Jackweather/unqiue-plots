@@ -93,7 +93,6 @@
         .grid {
             margin-top: 22px;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
             gap: 20px;
         }
 
@@ -116,11 +115,47 @@
             font-size: 1.05rem;
         }
 
+        .viewer-body {
+            padding: 18px;
+        }
+
+        .viewer-frame {
+            display: block;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            background: white;
+        }
+
         .card img {
             display: block;
             width: 100%;
             height: auto;
             background: white;
+        }
+
+        .slider-panel {
+            margin-top: 16px;
+            display: grid;
+            gap: 10px;
+        }
+
+        .slider-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            color: var(--muted);
+        }
+
+        .slider-meta strong {
+            color: var(--ink);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
         }
 
         .empty {
@@ -152,17 +187,51 @@
 
         {% if trend_plots %}
         <section class="grid">
-            {% for plot in trend_plots %}
+            {% set first_plot = trend_plots[0] %}
             <article class="card">
                 <header>
-                    <h2>{{ plot.label }}</h2>
+                    <h2 id="plot-title">{{ first_plot.label }}</h2>
                 </header>
-                <a href="{{ plot.url }}" target="_blank" rel="noreferrer">
-                    <img src="{{ plot.url }}" alt="{{ plot.label }}">
-                </a>
+                <div class="viewer-body">
+                    <a id="plot-link" class="viewer-frame" href="{{ first_plot.url }}" target="_blank" rel="noreferrer">
+                        <img id="plot-image" src="{{ first_plot.url }}" alt="{{ first_plot.label }}">
+                    </a>
+                    <div class="slider-panel">
+                        <div class="slider-meta">
+                            <strong id="plot-counter">1 / {{ trend_plots|length }}</strong>
+                            <span>Use the slider to move through all maps for this date.</span>
+                        </div>
+                        <input id="plot-slider" type="range" min="0" max="{{ trend_plots|length - 1 }}" value="0" step="1" aria-label="USA trend map slider">
+                    </div>
+                </div>
             </article>
-            {% endfor %}
         </section>
+        <script id="trend-plots-data" type="application/json">{{ trend_plots | tojson }}</script>
+        <script>
+            const trendPlots = JSON.parse(document.getElementById("trend-plots-data").textContent);
+            const slider = document.getElementById("plot-slider");
+            const title = document.getElementById("plot-title");
+            const counter = document.getElementById("plot-counter");
+            const link = document.getElementById("plot-link");
+            const image = document.getElementById("plot-image");
+
+            const renderPlot = (index) => {
+                const plot = trendPlots[index];
+                if (!plot) {
+                    return;
+                }
+
+                title.textContent = plot.label;
+                counter.textContent = `${index + 1} / ${trendPlots.length}`;
+                link.href = plot.url;
+                image.src = plot.url;
+                image.alt = plot.label;
+            };
+
+            slider.addEventListener("input", (event) => {
+                renderPlot(Number(event.target.value));
+            });
+        </script>
         {% else %}
         <section class="empty">
             {% if selected_date %}
