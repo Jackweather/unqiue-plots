@@ -7,6 +7,7 @@ from pathlib import Path
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 import numpy as np
 import requests
@@ -20,6 +21,7 @@ DEFAULT_OUTPUT_DIR = "/var/data/output"
 DEFAULT_TIMEOUT = 60
 DEFAULT_MAX_FORECAST_HOUR = 18
 DEFAULT_SMOOTHING_SIGMA = 4.0
+DEFAULT_BLOCK_SIZE = 8
 CONUS_BOUNDS = {
     "leftlon": -125.0,
     "rightlon": -66.5,
@@ -27,6 +29,16 @@ CONUS_BOUNDS = {
     "toplat": 49.5,
 }
 FIELD_CACHE: dict[tuple[int, int], tuple[np.ndarray, np.ndarray, np.ndarray, datetime] | None] = {}
+TREND_CMAP = LinearSegmentedColormap.from_list(
+    "temp_trend",
+    [
+        (0.0, "#1d4ed8"),
+        (0.4, "#93c5fd"),
+        (0.5, "#d1d5db"),
+        (0.6, "#fca5a5"),
+        (1.0, "#b91c1c"),
+    ],
+)
 
 
 @dataclass(frozen=True)
@@ -75,6 +87,12 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=DEFAULT_SMOOTHING_SIGMA,
         help="Gaussian smoothing strength for the trend field. Default is 2.2.",
+    )
+    parser.add_argument(
+        "--block-size",
+        type=int,
+        default=DEFAULT_BLOCK_SIZE,
+        help="Aggregate HRRR grid cells into NxN blocks before plotting. Default is 8.",
     )
     return parser.parse_args()
 
@@ -181,6 +199,33 @@ def smooth_field(field: np.ndarray, sigma: float) -> np.ndarray:
     return result
 
 
+def block_reduce_mean(field: np.ndarray, block_size: int) -> np.ndarray:
+    if block_size <= 1:
+        return field
+
+    rows = field.shape[0] // block_size
+    cols = field.shape[1] // block_size
+    if rows == 0 or cols == 0:
+        return field
+
+    trimmed = field[: rows * block_size, : cols * block_size]
+    reshaped = trimmed.reshape(rows, block_size, cols, block_size)
+    return np.nanmean(reshaped, axis=(1, 3))
+
+
+def aggregate_grid(
+    lats: np.ndarray,
+    lons: np.ndarray,
+    field: np.ndarray,
+    block_size: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    return (
+        block_reduce_mean(lats, block_size),
+        block_reduce_mean(lons, block_size),
+        block_reduce_mean(field, block_size),
+    )
+
+
 def collect_forecast_trend(
     session: requests.Session,
     date_str: str,
@@ -189,6 +234,7 @@ def collect_forecast_trend(
     timeout: int,
     raw_dir: Path,
     smoothing_sigma: float,
+    block_size: int,
 ) -> ForecastTrend | None:
     current_field = get_temperature_field(session, date_str, cycle_hour, forecast_hour, timeout, raw_dir)
     if current_field is None:
@@ -197,17 +243,7 @@ def collect_forecast_trend(
     current_lats, current_lons, current_temp_f, valid_time = current_field
 
     if cycle_hour == 0:
-        smoothed = smooth_field(current_temp_f, smoothing_sigma)
-        return ForecastTrend(
-            cycle_hour=cycle_hour,
-            comparison_cycle_hours=[0],
-            forecast_hour=forecast_hour,
-            valid_time=valid_time,
-            field_f=smoothed,
-            lats=current_lats,
-            lons=current_lons,
-            mode="absolute",
-        )
+        return None
 
     prior_fields: list[np.ndarray] = []
     comparison_cycle_hours: list[int] = []
@@ -229,17 +265,38 @@ def collect_forecast_trend(
         return None
 
     prior_mean_f = np.nanmean(np.stack(prior_fields), axis=0)
-    smoothed = smooth_field(current_temp_f - prior_mean_f, smoothing_sigma)
+    grouped_lats, grouped_lons, grouped_delta = aggregate_grid(
+        current_lats,
+        current_lons,
+        current_temp_f - prior_mean_f,
+        block_size,
+    )
+    smoothed = smooth_field(grouped_delta, smoothing_sigma)
     return ForecastTrend(
         cycle_hour=cycle_hour,
         comparison_cycle_hours=comparison_cycle_hours,
         forecast_hour=forecast_hour,
         valid_time=valid_time,
         field_f=smoothed,
-        lats=current_lats,
-        lons=current_lons,
+        lats=grouped_lats,
+        lons=grouped_lons,
         mode="trend",
     )
+
+
+def prefetch_temperature_fields(
+    session: requests.Session,
+    date_str: str,
+    latest_cycle: int,
+    max_forecast_hour: int,
+    timeout: int,
+    raw_dir: Path,
+) -> None:
+    print("Downloading HRRR fields before plotting", flush=True)
+    for cycle_hour in range(0, latest_cycle + 1):
+        print(f"Prefetching run {cycle_hour:02d}z", flush=True)
+        for forecast_hour in range(0, max_forecast_hour + 1):
+            get_temperature_field(session, date_str, cycle_hour, forecast_hour, timeout, raw_dir)
 
 
 def draw_trend_map(trend: ForecastTrend, output_path: Path, date_str: str) -> None:
@@ -253,18 +310,10 @@ def draw_trend_map(trend: ForecastTrend, output_path: Path, date_str: str) -> No
     ax.add_feature(cfeature.BORDERS.with_scale("50m"), linewidth=0.5)
     ax.add_feature(cfeature.STATES.with_scale("50m"), linewidth=0.35, edgecolor="#4b5563")
 
-    if trend.mode == "absolute":
-        vmin = float(np.nanpercentile(trend.field_f, 5))
-        vmax = float(np.nanpercentile(trend.field_f, 95))
-        levels = np.linspace(vmin, vmax, 17)
-        cmap = "coolwarm"
-        extend = "both"
-        colorbar_ticks = None
-    else:
-        levels = np.arange(-5, 5.5, 0.5)
-        cmap = "RdBu_r"
-        extend = "both"
-        colorbar_ticks = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]
+    levels = np.arange(-5, 5.5, 0.5)
+    cmap = TREND_CMAP
+    extend = "both"
+    colorbar_ticks = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]
     mesh = ax.contourf(
         trend.lons,
         trend.lats,
@@ -287,27 +336,16 @@ def draw_trend_map(trend: ForecastTrend, output_path: Path, date_str: str) -> No
         transform=ccrs.PlateCarree(),
     )
 
-    if trend.mode == "absolute":
-        ax.set_title(
-            "HRRR Smoothed 2 m Temperature\n"
-            f"{date_str} run {trend.cycle_hour:02d}z forecast f{trend.forecast_hour:02d} | "
-            f"valid {trend.valid_time:%m-%d %HZ}",
-            fontsize=16,
-            pad=16,
-        )
-        note = "Run 00 baseline map | Smoothed 2 m temperature field"
-        colorbar_label = "Temperature (F)"
-    else:
-        compared = " ".join(f"{hour:02d}z" for hour in trend.comparison_cycle_hours)
-        ax.set_title(
-            "HRRR Smoothed 2 m Temperature Change\n"
-            f"{date_str} run {trend.cycle_hour:02d}z forecast f{trend.forecast_hour:02d} versus {compared} | "
-            f"valid {trend.valid_time:%m-%d %HZ}",
-            fontsize=16,
-            pad=16,
-        )
-        note = "Red = warmer than earlier runs | Blue = cooler than earlier runs | 0 is neutral"
-        colorbar_label = "Temperature trend scale: -5 cooler to 0 neutral to 5 warmer"
+    compared = " ".join(f"{hour:02d}z" for hour in trend.comparison_cycle_hours)
+    ax.set_title(
+        "HRRR Smoothed 2 m Temperature Change\n"
+        f"{date_str} run {trend.cycle_hour:02d}z forecast f{trend.forecast_hour:02d} versus {compared} | "
+        f"valid {trend.valid_time:%m-%d %HZ}",
+        fontsize=16,
+        pad=16,
+    )
+    note = "Blue = cooler than the earlier-run average | Gray = near zero change | Red = warmer than the earlier-run average"
+    colorbar_label = "Temperature change (F): -5 cooler to 0 neutral to 5 warmer"
 
     ax.text(
         0.01,
@@ -348,8 +386,17 @@ def main() -> None:
     session = requests.Session()
     session.headers.update({"User-Agent": "hrrr-usa-temp-trend/1.0"})
 
+    prefetch_temperature_fields(
+        session=session,
+        date_str=args.date,
+        latest_cycle=latest_cycle,
+        max_forecast_hour=args.max_forecast_hour,
+        timeout=args.timeout,
+        raw_dir=raw_dir,
+    )
+
     saved_maps = 0
-    for cycle_hour in range(0, latest_cycle + 1):
+    for cycle_hour in range(1, latest_cycle + 1):
         print(f"Processing run {cycle_hour:02d}z", flush=True)
         for forecast_hour in range(0, args.max_forecast_hour + 1):
             trend = collect_forecast_trend(
@@ -360,6 +407,7 @@ def main() -> None:
                 timeout=args.timeout,
                 raw_dir=raw_dir,
                 smoothing_sigma=args.smoothing_sigma,
+                block_size=args.block_size,
             )
             if trend is None:
                 print(
