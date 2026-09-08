@@ -5,6 +5,7 @@ import gc
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -29,6 +30,7 @@ CONUS_BOUNDS = {
     "bottomlat": 24.0,
     "toplat": 49.5,
 }
+EASTERN_TIMEZONE = ZoneInfo("America/New_York")
 FIELD_CACHE: dict[tuple[str, int, int], tuple[np.ndarray, np.ndarray, np.ndarray, datetime] | None] = {}
 TREND_LEVELS = np.arange(-5.0, 5.5, 0.5)
 TREND_CMAP = ListedColormap(
@@ -230,6 +232,17 @@ def iter_prior_run_requests(
         )
 
     return requests
+
+
+def resolve_latest_cycle(target_date: datetime, now_utc: datetime) -> int:
+    if target_date.date() < now_utc.date():
+        return 23
+
+    eastern_now = now_utc.astimezone(EASTERN_TIMEZONE)
+    if eastern_now.hour in {20, 21}:
+        return 23
+
+    return now_utc.hour
 
 
 def smooth_field(field: np.ndarray, sigma: float) -> np.ndarray:
@@ -434,7 +447,7 @@ def main() -> None:
 
     target_date = datetime.strptime(args.date, DEFAULT_DATE_FORMAT).replace(tzinfo=timezone.utc)
     now_utc = datetime.now(timezone.utc)
-    latest_cycle = 23 if target_date.date() < now_utc.date() else now_utc.hour
+    latest_cycle = resolve_latest_cycle(target_date, now_utc)
 
     print(f"Starting CONUS HRRR temperature trend run for {args.date}", flush=True)
     print(f"Output directory: {output_dir}", flush=True)
