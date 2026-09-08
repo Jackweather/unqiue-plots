@@ -207,7 +207,7 @@
             <h1>HRRR Plot Viewer</h1>
             <p>Browse saved HRRR 2 m temperature plots for New York, Maryland, New Jersey, Connecticut, Maine, Massachusetts, and Vermont. New day folders appear automatically when your download script writes them.</p>
 
-            <form class="toolbar" method="get">
+            <form id="page-filter-form" class="toolbar" method="get">
                 <label for="date">Date</label>
                 <select id="date" name="date">
                     {% for date in available_dates %}
@@ -221,7 +221,6 @@
                     {% endfor %}
                 </select>
                 <div class="toolbar-actions">
-                    <button type="submit">View Plots</button>
                     <a class="download-link" href="/usa-trends">Product Maps</a>
                     {% if selected_date and raw_grib_available %}
                     <a class="download-link" href="/downloads/raw-grib.zip?date={{ selected_date }}">Download Selected Date</a>
@@ -258,6 +257,16 @@
             </section>
             {% endif %}
         </section>
+        <script>
+            const pageFilterForm = document.getElementById("page-filter-form");
+            const pageFilterSelects = pageFilterForm?.querySelectorAll("select");
+
+            for (const select of pageFilterSelects ?? []) {
+                select.addEventListener("change", () => {
+                    pageFilterForm.requestSubmit();
+                });
+            }
+        </script>
 
         {% if plots %}
         <section class="grid">
