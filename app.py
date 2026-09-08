@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-import re
 import subprocess
 import sys
 import threading
@@ -21,8 +20,6 @@ LOG_DIR = DATA_DIR / "logs"
 RENDER_BASE_DIR = Path("/opt/render/project/src/")
 
 app = Flask(__name__)
-
-RUN_META_PATTERN = re.compile(r"^(Task run id|Started at|Finished at|Duration seconds):\s*(.+)$")
 
 
 def resolve_script_path(render_script: str, local_script: str) -> tuple[str, str]:
@@ -88,104 +85,6 @@ def get_date_directories() -> list[Path]:
         key=lambda path: path.name,
         reverse=True,
     )
-
-
-def format_duration(duration_seconds: float | None) -> str:
-    if duration_seconds is None:
-        return "Running"
-
-    total_seconds = int(round(duration_seconds))
-    minutes, seconds = divmod(total_seconds, 60)
-    hours, minutes = divmod(minutes, 60)
-    return f"{hours}h {minutes}m {seconds}s"
-
-
-def get_run_history() -> list[dict[str, str | float | int | None | list[dict[str, str | float | int | None]]]]:
-    if not LOG_DIR.exists():
-        return []
-
-    history_by_task: dict[str, dict[str, str | float | int | None | list[dict[str, str | float | int | None]]]] = {}
-    for log_path in sorted(LOG_DIR.glob("*.log"), reverse=True):
-        task_run_id: str | None = None
-        started_at: str | None = None
-        finished_at: str | None = None
-        duration_seconds: float | None = None
-        exit_code: int | None = None
-
-        with log_path.open("r", encoding="utf-8") as log_file:
-            for raw_line in log_file:
-                line = raw_line.strip()
-                meta_match = RUN_META_PATTERN.match(line)
-                if meta_match:
-                    key, value = meta_match.groups()
-                    if key == "Task run id":
-                        task_run_id = value
-                    elif key == "Started at":
-                        started_at = value
-                    elif key == "Finished at":
-                        finished_at = value
-                    elif key == "Duration seconds":
-                        try:
-                            duration_seconds = float(value)
-                        except ValueError:
-                            duration_seconds = None
-                    continue
-
-                if line.startswith("Exit code:"):
-                    try:
-                        exit_code = int(line.split(":", 1)[1].strip())
-                    except ValueError:
-                        exit_code = None
-
-        if task_run_id is None:
-            task_run_id = log_path.stem.rsplit("_", 3)[0]
-
-        script_stem_parts = log_path.stem.rsplit("_", 3)
-        script_name = f"{script_stem_parts[-3]}.py" if len(script_stem_parts) >= 4 else f"{log_path.stem.split('_')[0]}.py"
-        run_entry = {
-            "script_name": script_name,
-            "log_name": log_path.name,
-            "started_at": started_at,
-            "finished_at": finished_at,
-            "duration_seconds": duration_seconds,
-            "duration_label": format_duration(duration_seconds),
-            "exit_code": exit_code,
-        }
-
-        if task_run_id not in history_by_task:
-            history_by_task[task_run_id] = {
-                "task_run_id": task_run_id,
-                "started_at": started_at,
-                "finished_at": finished_at,
-                "duration_seconds": duration_seconds or 0.0,
-                "duration_label": format_duration(duration_seconds),
-                "runs": [run_entry],
-            }
-            continue
-
-        task_entry = history_by_task[task_run_id]
-        task_runs = task_entry["runs"]
-        assert isinstance(task_runs, list)
-        task_runs.append(run_entry)
-
-        first_started_at = task_entry.get("started_at")
-        if first_started_at is None or (started_at is not None and started_at < first_started_at):
-            task_entry["started_at"] = started_at
-
-        last_finished_at = task_entry.get("finished_at")
-        if finished_at is None or last_finished_at is None:
-            task_entry["finished_at"] = finished_at if last_finished_at is not None else last_finished_at
-        elif finished_at > last_finished_at:
-            task_entry["finished_at"] = finished_at
-
-        total_duration_seconds = task_entry.get("duration_seconds")
-        if isinstance(total_duration_seconds, (int, float)) and duration_seconds is not None:
-            task_entry["duration_seconds"] = float(total_duration_seconds) + duration_seconds
-            task_entry["duration_label"] = format_duration(task_entry["duration_seconds"])
-
-    history = list(history_by_task.values())
-    history.sort(key=lambda item: str(item.get("started_at") or ""), reverse=True)
-    return history
 
 
 STATE_OPTIONS = get_state_options()
@@ -363,11 +262,6 @@ def usa_trends() -> str:
     )
 
 
-@app.route("/run-history")
-def run_history() -> str:
-    return render_template("run_history.html", run_history=get_run_history())
-
-
 @app.route("/run-task1")
 def run_task1():
     task_run_id = datetime.now().strftime("task1_%Y%m%d_%H%M%S_%f")
@@ -382,7 +276,7 @@ def run_task1():
         ),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
-    return f"Task started in background as {task_run_id}. Check /run-history for timing details.", 200
+    return f"Task started in background as {task_run_id}.", 200
 
 
 
