@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import gc
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import cartopy.crs as ccrs
@@ -29,7 +29,7 @@ CONUS_BOUNDS = {
     "bottomlat": 24.0,
     "toplat": 49.5,
 }
-FIELD_CACHE: dict[tuple[int, int], tuple[np.ndarray, np.ndarray, np.ndarray, datetime] | None] = {}
+FIELD_CACHE: dict[tuple[str, int, int], tuple[np.ndarray, np.ndarray, np.ndarray, datetime] | None] = {}
 TREND_LEVELS = np.arange(-5.0, 5.5, 0.5)
 TREND_CMAP = ListedColormap(
     [
@@ -188,7 +188,7 @@ def get_temperature_field(
     timeout: int,
     raw_dir: Path,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, datetime] | None:
-    cache_key = (cycle_hour, forecast_hour)
+    cache_key = (date_str, cycle_hour, forecast_hour)
     if cache_key in FIELD_CACHE:
         return FIELD_CACHE[cache_key]
 
@@ -205,6 +205,31 @@ def get_temperature_field(
 def clear_field_cache() -> None:
     FIELD_CACHE.clear()
     gc.collect()
+
+
+def iter_prior_run_requests(
+    date_str: str,
+    cycle_hour: int,
+    forecast_hour: int,
+    max_forecast_hour: int,
+) -> list[tuple[str, int, int]]:
+    run_start = datetime.strptime(date_str, DEFAULT_DATE_FORMAT).replace(tzinfo=timezone.utc) + timedelta(hours=cycle_hour)
+    requests: list[tuple[str, int, int]] = []
+    for hours_back in range(1, max_forecast_hour + 1):
+        prior_forecast_hour = forecast_hour + hours_back
+        if prior_forecast_hour > max_forecast_hour:
+            break
+
+        prior_run_start = run_start - timedelta(hours=hours_back)
+        requests.append(
+            (
+                prior_run_start.strftime(DEFAULT_DATE_FORMAT),
+                prior_run_start.hour,
+                prior_forecast_hour,
+            )
+        )
+
+    return requests
 
 
 def smooth_field(field: np.ndarray, sigma: float) -> np.ndarray:
@@ -265,18 +290,17 @@ def collect_forecast_trend(
 
     current_lats, current_lons, current_temp_f, valid_time = current_field
 
-    if cycle_hour == 0:
-        return None
-
     prior_fields: list[np.ndarray] = []
     comparison_labels: list[str] = []
-    for previous_cycle_hour in range(0, cycle_hour):
-        previous_forecast_hour = forecast_hour + (cycle_hour - previous_cycle_hour)
-        if previous_forecast_hour > max_forecast_hour:
-            continue
+    for previous_date_str, previous_cycle_hour, previous_forecast_hour in iter_prior_run_requests(
+        date_str,
+        cycle_hour,
+        forecast_hour,
+        max_forecast_hour,
+    ):
         previous_field = get_temperature_field(
             session,
-            date_str,
+            previous_date_str,
             previous_cycle_hour,
             previous_forecast_hour,
             timeout,
@@ -292,7 +316,7 @@ def collect_forecast_trend(
             continue
 
         prior_fields.append(previous_temp_f)
-        comparison_labels.append(f"{previous_cycle_hour:02d}z f{previous_forecast_hour:02d}")
+        comparison_labels.append(f"{previous_date_str} {previous_cycle_hour:02d}z f{previous_forecast_hour:02d}")
 
     if not prior_fields:
         return None
@@ -429,7 +453,7 @@ def main() -> None:
     )
 
     saved_maps = 0
-    for cycle_hour in range(1, latest_cycle + 1):
+    for cycle_hour in range(0, latest_cycle + 1):
         print(f"Processing run {cycle_hour:02d}z", flush=True)
         for forecast_hour in range(0, args.max_forecast_hour + 1):
             trend = collect_forecast_trend(
