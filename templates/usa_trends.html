@@ -31,47 +31,60 @@
 
         .shell {
             width: min(1180px, calc(100% - 24px));
-            margin: 14px auto;
+            margin: 10px auto;
         }
 
         .hero {
             background: color-mix(in srgb, var(--panel) 92%, white 8%);
             border: 1px solid var(--line);
-            border-radius: 20px;
-            padding: 16px 18px;
+            border-radius: 16px;
+            padding: 10px 14px;
             box-shadow: 0 20px 40px rgba(31, 42, 46, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
         }
 
         h1 {
-            margin: 0 0 8px;
-            font-size: clamp(1.5rem, 3vw, 2.35rem);
+            margin: 0;
+            font-size: clamp(1.2rem, 2.4vw, 1.9rem);
             line-height: 1;
         }
 
         p {
             margin: 0;
             color: var(--muted);
-            font-size: 0.92rem;
+            font-size: 0.82rem;
+        }
+
+        .hero-copy {
+            display: grid;
+            gap: 4px;
+            min-width: 240px;
+            flex: 1 1 320px;
         }
 
         .toolbar {
-            margin-top: 12px;
             display: flex;
-            gap: 12px;
+            gap: 8px;
             align-items: center;
             flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
         label {
             font-weight: 700;
+            font-size: 0.88rem;
         }
 
         select,
         button,
         .home-link {
-            border-radius: 12px;
+            border-radius: 10px;
             border: 1px solid var(--line);
-            padding: 8px 12px;
+            padding: 6px 10px;
             font: inherit;
         }
 
@@ -91,9 +104,9 @@
         }
 
         .grid {
-            margin-top: 14px;
+            margin-top: 10px;
             display: grid;
-            gap: 20px;
+            gap: 16px;
         }
 
         .card {
@@ -105,7 +118,7 @@
         }
 
         .card header {
-            padding: 10px 14px;
+            padding: 8px 12px;
             background: var(--accent-soft);
             border-bottom: 1px solid var(--line);
         }
@@ -116,7 +129,7 @@
         }
 
         .viewer-body {
-            padding: 12px;
+            padding: 10px;
         }
 
         .viewer-frame {
@@ -132,7 +145,7 @@
         .card img {
             display: block;
             width: 100%;
-            max-height: 62vh;
+            max-height: 69vh;
             object-fit: contain;
             background: white;
         }
@@ -167,7 +180,7 @@
             align-items: end;
             gap: 12px;
             flex-wrap: wrap;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .control-group {
@@ -187,8 +200,16 @@
         }
 
         @media (max-width: 720px) {
+            .hero {
+                align-items: stretch;
+            }
+
+            .toolbar {
+                justify-content: flex-start;
+            }
+
             .card img {
-                max-height: 48vh;
+                max-height: 54vh;
             }
         }
 
@@ -204,9 +225,10 @@
 <body>
     <main class="shell">
         <section class="hero">
-            <h1>USA Temperature Trend Maps</h1>
-            <p>Browse USA trend maps by date. The page starts on the most recent run, and you can switch to older runs with the dropdown.</p>
-
+            <div class="hero-copy">
+                <h1>USA Temperature Trend Maps</h1>
+                <p>Browse USA trend maps by date, starting with the most recent run.</p>
+            </div>
             <form class="toolbar" method="get">
                 <label for="date">Date</label>
                 <select id="date" name="date">
