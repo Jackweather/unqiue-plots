@@ -245,6 +245,18 @@ def resolve_latest_cycle(target_date: datetime, now_utc: datetime) -> int:
     return now_utc.hour
 
 
+def resolve_run_date_and_latest_cycle(requested_date_str: str, now_utc: datetime) -> tuple[str, int]:
+    requested_date = datetime.strptime(requested_date_str, DEFAULT_DATE_FORMAT).replace(tzinfo=timezone.utc)
+    eastern_now = now_utc.astimezone(EASTERN_TIMEZONE)
+    current_utc_date_str = now_utc.strftime(DEFAULT_DATE_FORMAT)
+
+    if requested_date_str == current_utc_date_str and eastern_now.hour in {20, 21}:
+        prior_utc_date = (now_utc - timedelta(days=1)).strftime(DEFAULT_DATE_FORMAT)
+        return prior_utc_date, 23
+
+    return requested_date_str, resolve_latest_cycle(requested_date, now_utc)
+
+
 def smooth_field(field: np.ndarray, sigma: float) -> np.ndarray:
     mask = np.isfinite(field)
     if not np.any(mask):
@@ -440,16 +452,14 @@ def draw_trend_map(trend: ForecastTrend, output_path: Path, date_str: str) -> No
 def main() -> None:
     args = parse_args()
     FIELD_CACHE.clear()
+    now_utc = datetime.now(timezone.utc)
+    resolved_date_str, latest_cycle = resolve_run_date_and_latest_cycle(args.date, now_utc)
     output_dir = Path(args.output_dir)
-    date_dir = output_dir / args.date
+    date_dir = output_dir / resolved_date_str
     raw_dir = date_dir / "raw_grib_usa_temp_trend"
     plot_dir = date_dir / "plots" / "usa_temp_trend"
 
-    target_date = datetime.strptime(args.date, DEFAULT_DATE_FORMAT).replace(tzinfo=timezone.utc)
-    now_utc = datetime.now(timezone.utc)
-    latest_cycle = resolve_latest_cycle(target_date, now_utc)
-
-    print(f"Starting CONUS HRRR temperature trend run for {args.date}", flush=True)
+    print(f"Starting CONUS HRRR temperature trend run for {resolved_date_str}", flush=True)
     print(f"Output directory: {output_dir}", flush=True)
     print(f"Building run maps from 00z through {latest_cycle:02d}z", flush=True)
 
@@ -458,7 +468,7 @@ def main() -> None:
 
     prefetch_temperature_fields(
         session=session,
-        date_str=args.date,
+        date_str=resolved_date_str,
         latest_cycle=latest_cycle,
         max_forecast_hour=args.max_forecast_hour,
         timeout=args.timeout,
@@ -471,7 +481,7 @@ def main() -> None:
         for forecast_hour in range(0, args.max_forecast_hour + 1):
             trend = collect_forecast_trend(
                 session=session,
-                date_str=args.date,
+                date_str=resolved_date_str,
                 cycle_hour=cycle_hour,
                 forecast_hour=forecast_hour,
                 max_forecast_hour=args.max_forecast_hour,
@@ -487,8 +497,8 @@ def main() -> None:
                 )
                 continue
 
-            output_path = plot_dir / f"hrrr_usa_temp_trend_{args.date}_{cycle_hour:02d}z_f{forecast_hour:02d}.png"
-            draw_trend_map(trend, output_path, args.date)
+            output_path = plot_dir / f"hrrr_usa_temp_trend_{resolved_date_str}_{cycle_hour:02d}z_f{forecast_hour:02d}.png"
+            draw_trend_map(trend, output_path, resolved_date_str)
             print(f"Saved output: {output_path}", flush=True)
             saved_maps += 1
             clear_field_cache()
