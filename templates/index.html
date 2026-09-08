@@ -6,281 +6,297 @@
     <title>HRRR Plot Viewer</title>
     <style>
         :root {
-            --bg: #eef3ef;
-            --panel: #fbf8f3;
-            --ink: #1f2a2e;
-            --muted: #5f6a6d;
-            --line: #d1d9d3;
-            --accent: #0d6b5f;
-            --accent-soft: #d8ece6;
+            --page: #f4f7fb;
+            --surface: #ffffff;
+            --surface-alt: #f8fafc;
+            --surface-strong: #eaf0f8;
+            --ink: #142033;
+            --muted: #607087;
+            --line: #d8e0ea;
+            --line-strong: #c2cedd;
+            --accent: #1f5eff;
+            --accent-deep: #173ea6;
+            --accent-soft: rgba(31, 94, 255, 0.1);
+            --success: #0f8a5f;
+            --shadow-sm: 0 12px 30px rgba(16, 24, 40, 0.08);
+            --shadow-lg: 0 28px 70px rgba(15, 23, 42, 0.14);
+            --radius-sm: 14px;
+            --radius-md: 20px;
+            --radius-lg: 28px;
+            --content-width: 1440px;
         }
 
-        * {
-            box-sizing: border-box;
-        }
-
+        * { box-sizing: border-box; }
+        html { color-scheme: light; }
         body {
             margin: 0;
-            font-family: Georgia, "Times New Roman", serif;
+            font-family: "Segoe UI", "Aptos", "Helvetica Neue", sans-serif;
             color: var(--ink);
             background:
-                radial-gradient(circle at top left, #ffffff 0, #ffffff80 22%, transparent 45%),
-                linear-gradient(135deg, #dbe7e0 0%, var(--bg) 48%, #f6ede0 100%);
+                radial-gradient(circle at 0 0, rgba(31, 94, 255, 0.1), transparent 28%),
+                radial-gradient(circle at 100% 0, rgba(15, 138, 95, 0.08), transparent 24%),
+                linear-gradient(180deg, #eef4fb 0%, var(--page) 38%, #f7f9fc 100%);
             min-height: 100vh;
         }
-
-        .shell {
-            width: min(1200px, calc(100% - 32px));
-            margin: 24px auto;
+        a { color: inherit; }
+        button, select, input { font: inherit; }
+        .page { width: min(var(--content-width), calc(100% - 32px)); margin: 0 auto; padding: 24px 0 40px; }
+        .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 0 22px; }
+        .brand { display: flex; align-items: center; gap: 14px; }
+        .brand-mark {
+            width: 46px; height: 46px; border-radius: 16px; display: grid; place-items: center; color: #fff;
+            font-size: 1.15rem; font-weight: 800; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%);
+            box-shadow: 0 18px 36px rgba(31, 94, 255, 0.25);
         }
-
+        .brand-copy { display: grid; gap: 3px; }
+        .eyebrow { margin: 0; color: var(--accent-deep); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+        .brand-title { margin: 0; font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
+        .top-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .app-link, .download-link, button {
+            min-height: 44px; border-radius: var(--radius-sm); padding: 0 16px; border: 1px solid transparent; text-decoration: none;
+            display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+            transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+        }
+        .app-link, .download-link { background: rgba(255, 255, 255, 0.78); color: var(--ink); border-color: var(--line); box-shadow: var(--shadow-sm); font-weight: 600; }
+        button { background: linear-gradient(135deg, var(--accent) 0%, #2e7bff 100%); color: #fff; border-color: rgba(20, 32, 51, 0.06); box-shadow: 0 14px 28px rgba(31, 94, 255, 0.25); cursor: pointer; font-weight: 700; }
+        .app-link:hover, .download-link:hover, button:hover, select:hover, .plot-card:hover { transform: translateY(-1px); }
         .hero {
-            background: color-mix(in srgb, var(--panel) 92%, white 8%);
-            border: 1px solid var(--line);
-            border-radius: 20px;
-            padding: 24px;
-            box-shadow: 0 20px 40px rgba(31, 42, 46, 0.08);
+            position: relative; overflow: hidden; background: linear-gradient(140deg, rgba(20, 32, 51, 0.98) 0%, rgba(23, 62, 166, 0.95) 58%, rgba(14, 104, 171, 0.92) 100%);
+            color: #fff; border-radius: var(--radius-lg); padding: 34px; box-shadow: var(--shadow-lg);
         }
-
-        h1 {
-            margin: 0 0 8px;
-            font-size: clamp(2rem, 4vw, 3.3rem);
-            line-height: 1;
+        .hero::before, .hero::after { content: ""; position: absolute; border-radius: 999px; pointer-events: none; }
+        .hero::before { inset: auto -120px -140px auto; width: 340px; height: 340px; background: radial-gradient(circle, rgba(255, 255, 255, 0.16), transparent 68%); }
+        .hero::after { inset: -120px auto auto -120px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(88, 194, 255, 0.2), transparent 72%); }
+        .hero-grid { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.95fr); gap: 24px; align-items: start; }
+        .hero-copy { display: grid; gap: 18px; max-width: 760px; }
+        h1 { margin: 0; font-size: clamp(2.3rem, 5vw, 4.5rem); line-height: 0.96; letter-spacing: -0.05em; }
+        .hero-copy p { margin: 0; max-width: 62ch; color: rgba(240, 245, 255, 0.84); font-size: 1.05rem; line-height: 1.65; }
+        .hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .stat { padding: 16px 18px; border-radius: 18px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12); backdrop-filter: blur(8px); }
+        .stat span { display: block; color: rgba(240, 245, 255, 0.72); font-size: 0.84rem; }
+        .stat strong { display: block; margin-top: 8px; font-size: 1.55rem; letter-spacing: -0.03em; }
+        .hero-panel { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 24px; padding: 22px; backdrop-filter: blur(12px); display: grid; gap: 18px; }
+        .panel-heading { display: grid; gap: 6px; }
+        .panel-heading h2, .section-header h2, .sidebar-card h2, .empty h2, .download-panel h2 { margin: 0; font-size: 1.18rem; letter-spacing: -0.03em; }
+        .panel-heading p, .section-header p, .sidebar-card p, .empty p, .download-panel p, .meta-copy, .meta-label { margin: 0; color: var(--muted); line-height: 1.55; }
+        .hero .panel-heading p { color: rgba(240, 245, 255, 0.74); }
+        .filters { display: grid; gap: 14px; }
+        .field { display: grid; gap: 7px; }
+        .field label, .download-option, .checklist-label { font-size: 0.88rem; font-weight: 700; letter-spacing: 0.01em; }
+        .field select {
+            width: 100%; min-height: 48px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.96);
+            color: var(--ink); padding: 0 15px; outline: none; transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
         }
-
-        p {
-            margin: 0;
-            color: var(--muted);
-            font-size: 1rem;
-        }
-
-        .toolbar {
-            margin-top: 18px;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .toolbar-actions {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .download-panel {
-            margin-top: 18px;
-            padding: 16px;
-            border: 1px solid var(--line);
-            border-radius: 16px;
-            background: rgba(255, 255, 255, 0.55);
-        }
-
-        .download-panel h2 {
-            margin: 0 0 10px;
-            font-size: 1.05rem;
-        }
-
-        .download-panel p {
-            margin-bottom: 12px;
-            font-size: 0.95rem;
-        }
-
-        .download-form {
-            display: grid;
-            gap: 12px;
-        }
-
-        .download-options {
-            display: grid;
-            gap: 8px;
-            max-height: 220px;
-            overflow-y: auto;
-            padding: 12px;
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            background: rgba(251, 248, 243, 0.9);
-        }
-
-        .download-option {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-weight: 400;
-        }
-
-        .download-option input {
-            margin: 0;
-        }
-
-        .state-note {
-            margin-top: 12px;
-            font-size: 0.92rem;
-            color: var(--muted);
-        }
-
-        label {
-            font-weight: 700;
-        }
-
-        select,
-        button {
-            border-radius: 12px;
-            border: 1px solid var(--line);
-            padding: 10px 14px;
-            font: inherit;
-        }
-
-        button {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
-            cursor: pointer;
-        }
-
-        .download-link {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 44px;
-            padding: 10px 14px;
-            border-radius: 12px;
-            border: 1px solid var(--accent);
-            background: transparent;
-            color: var(--accent);
-            text-decoration: none;
-            font-weight: 700;
-        }
-
-        .grid {
-            margin-top: 22px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 20px;
-        }
-
-        .card {
-            background: rgba(251, 248, 243, 0.92);
-            border: 1px solid var(--line);
-            border-radius: 18px;
-            overflow: hidden;
-            box-shadow: 0 18px 36px rgba(31, 42, 46, 0.07);
-        }
-
-        .card header {
-            padding: 14px 16px;
-            background: var(--accent-soft);
-            border-bottom: 1px solid var(--line);
-        }
-
-        .card h2 {
-            margin: 0;
-            font-size: 1.1rem;
-        }
-
-        .card img {
-            display: block;
-            width: 100%;
-            height: auto;
-            background: white;
-        }
-
-        .empty {
-            margin-top: 22px;
-            padding: 22px;
-            border-radius: 18px;
-            border: 1px dashed var(--line);
-            background: rgba(255, 255, 255, 0.6);
-        }
-
-        .dates {
-            margin-top: 14px;
-            color: var(--muted);
-            font-size: 0.95rem;
+        .field select:focus, .sidebar-select:focus, .download-options:focus-within { border-color: rgba(31, 94, 255, 0.55); box-shadow: 0 0 0 4px rgba(31, 94, 255, 0.12); }
+        .panel-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+        .panel-note { display: flex; align-items: start; gap: 10px; padding: 14px 16px; border-radius: 18px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.14); color: rgba(240, 245, 255, 0.82); font-size: 0.92rem; line-height: 1.5; }
+        .panel-note strong { color: #fff; }
+        .content-grid { margin-top: 24px; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
+        .main-column, .sidebar { display: grid; gap: 22px; }
+        .section-card, .sidebar-card, .download-panel, .empty { background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(216, 224, 234, 0.95); border-radius: 24px; box-shadow: var(--shadow-sm); }
+        .section-card { padding: 24px; }
+        .section-header { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+        .section-kicker { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-deep); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+        .plot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+        .plot-card { display: grid; overflow: hidden; border-radius: 22px; background: linear-gradient(180deg, var(--surface) 0%, var(--surface-alt) 100%); border: 1px solid var(--line); box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08); text-decoration: none; transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease; }
+        .plot-card:hover { box-shadow: 0 24px 44px rgba(15, 23, 42, 0.12); border-color: rgba(31, 94, 255, 0.24); }
+        .plot-card-head { display: flex; justify-content: space-between; gap: 14px; align-items: start; padding: 18px 20px 14px; }
+        .plot-card-head h3 { margin: 0; font-size: 1.02rem; line-height: 1.35; letter-spacing: -0.02em; }
+        .plot-tag { flex: 0 0 auto; padding: 7px 10px; border-radius: 999px; background: var(--surface-strong); color: var(--accent-deep); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+        .plot-figure { position: relative; margin: 0; padding: 0 16px 16px; }
+        .plot-image-wrap { border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: linear-gradient(180deg, #f7f9fc 0%, #eef3f9 100%); }
+        .plot-card img { display: block; width: 100%; height: auto; transition: transform 220ms ease; background: #fff; }
+        .plot-card:hover img { transform: scale(1.012); }
+        .plot-card-foot { display: flex; justify-content: space-between; gap: 14px; align-items: center; padding: 0 20px 18px; color: var(--muted); font-size: 0.9rem; }
+        .plot-card-foot strong { color: var(--ink); font-size: 0.92rem; }
+        .sidebar-card { padding: 22px; }
+        .meta-list, .timeline, .download-list { display: grid; gap: 14px; margin-top: 18px; }
+        .meta-item, .timeline-item, .download-item { display: grid; gap: 6px; padding: 14px 16px; border-radius: 18px; background: var(--surface-alt); border: 1px solid var(--line); }
+        .meta-value { font-size: 1rem; font-weight: 700; letter-spacing: -0.02em; }
+        .timeline-item strong, .download-item strong { font-size: 0.95rem; }
+        .sidebar-select { width: 100%; min-height: 46px; margin-top: 14px; border-radius: 15px; border: 1px solid var(--line); background: #fff; padding: 0 14px; outline: none; transition: border-color 160ms ease, box-shadow 160ms ease; }
+        .download-panel { padding: 24px; }
+        .download-form { margin-top: 18px; display: grid; gap: 16px; }
+        .download-options { display: grid; gap: 10px; max-height: 280px; overflow: auto; padding: 14px; border-radius: 18px; border: 1px solid var(--line); background: var(--surface-alt); }
+        .download-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.8); border: 1px solid transparent; transition: border-color 160ms ease, background-color 160ms ease; }
+        .download-option:hover { border-color: rgba(31, 94, 255, 0.24); background: #fff; }
+        .download-option span { color: var(--ink); font-weight: 600; }
+        .download-option input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+        .download-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+        .empty { padding: 34px; text-align: center; }
+        .empty-icon { width: 58px; height: 58px; margin: 0 auto 16px; border-radius: 18px; display: grid; place-items: center; background: var(--surface-strong); color: var(--accent-deep); font-size: 1.5rem; font-weight: 800; }
+        .footer { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-top: 24px; padding: 18px 4px 0; color: var(--muted); font-size: 0.9rem; flex-wrap: wrap; }
+        .footer strong { color: var(--ink); }
+        @media (max-width: 1120px) { .hero-grid, .content-grid { grid-template-columns: 1fr; } .sidebar { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); } }
+        @media (max-width: 760px) {
+            .page { width: min(var(--content-width), calc(100% - 18px)); padding-top: 16px; }
+            .topbar { padding-top: 8px; }
+            .hero, .section-card, .sidebar-card, .download-panel, .empty { border-radius: 20px; }
+            .hero { padding: 24px 20px; }
+            .hero-stats { grid-template-columns: 1fr; }
+            h1 { font-size: clamp(2.2rem, 11vw, 3.5rem); }
+            .section-header, .plot-card-head, .plot-card-foot, .footer, .topbar { align-items: start; flex-direction: column; }
+            .panel-actions, .download-actions, .top-actions { width: 100%; }
+            .panel-actions > *, .download-actions > *, .top-actions > * { width: 100%; }
+            .app-link, .download-link, button { width: 100%; }
+            .plot-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
-    <main class="shell">
-        <section class="hero">
-            <h1>HRRR Plot Viewer</h1>
-            <p>Browse saved HRRR 2 m temperature plots for New York, Maryland, New Jersey, Connecticut, Maine, Massachusetts, and Vermont. New day folders appear automatically when your download script writes them.</p>
-
-            <form class="toolbar" method="get">
-                <label for="date">Date</label>
-                <select id="date" name="date">
-                    {% for date in available_dates %}
-                    <option value="{{ date }}" {% if date == selected_date %}selected{% endif %}>{{ date }}</option>
-                    {% endfor %}
-                </select>
-                <label for="state">State</label>
-                <select id="state" name="state">
-                    {% for state in state_options %}
-                    <option value="{{ state.key }}" {% if state.key == selected_state %}selected{% endif %}>{{ state.label }}{% if not state.supported %} (not in current HRRR workflow){% endif %}</option>
-                    {% endfor %}
-                </select>
-                <div class="toolbar-actions">
-                    <button type="submit">View Plots</button>
-                        <a class="download-link" href="/products-maps">Product Maps</a>
-                    {% if selected_date and raw_grib_available %}
-                    <a class="download-link" href="/downloads/raw-grib.zip?date={{ selected_date }}">Download Selected Date</a>
-                    {% endif %}
+    <main class="page">
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-mark">H</div>
+                <div class="brand-copy">
+                    <p class="eyebrow">Operations Dashboard</p>
+                    <p class="brand-title">HRRR Temperature Plot Viewer</p>
                 </div>
-            </form>
-
-            {% if available_dates %}
-            <div class="dates">Available dates: {{ available_dates | join(', ') }}</div>
-            {% endif %}
-
-            {% if selected_state %}
-            <div class="state-note">Viewing state: {{ selected_state_label }}. This workflow is currently limited to the Northeast state set shown in the selector.</div>
-            {% endif %}
-
-            {% if downloadable_dates %}
-            <section class="download-panel">
-                <h2>Download Raw GRIB Zip</h2>
-                <p>Choose one date, several dates, or download every available date in one zip.</p>
-                <form class="download-form" method="get" action="/downloads/raw-grib.zip">
-                    <div class="download-options">
-                        {% for date in downloadable_dates %}
-                        <label class="download-option" for="download-date-{{ date }}">
-                            <input id="download-date-{{ date }}" type="checkbox" name="date" value="{{ date }}" {% if date == selected_date %}checked{% endif %}>
-                            <span>{{ date }}</span>
-                        </label>
+            </div>
+            <nav class="top-actions" aria-label="Primary navigation">
+                <a class="app-link" href="/products-maps">Product Maps</a>
+                {% if selected_date and raw_grib_available %}
+                <a class="download-link" href="/downloads/raw-grib.zip?date={{ selected_date }}">Download Selected Date</a>
+                {% endif %}
+            </nav>
+        </header>
+        <section class="hero">
+            <div class="hero-grid">
+                <div class="hero-copy">
+                    <div>
+                        <p class="eyebrow">Forecast Archive</p>
+                        <h1>View HRRR temperature plots by date and state.</h1>
+                    </div>
+                    <p>Browse saved plots, change the date or state, and download raw model files when they are available.</p>
+                    <div class="hero-stats">
+                        <div class="stat"><span>Available dates</span><strong>{{ available_dates|length }}</strong></div>
+                        <div class="stat"><span>Visible plots</span><strong>{{ plots|length }}</strong></div>
+                        <div class="stat"><span>Selected state</span><strong>{{ selected_state_label or 'None' }}</strong></div>
+                    </div>
+                </div>
+                <aside class="hero-panel">
+                    <div class="panel-heading">
+                        <h2>Explore Plot Sets</h2>
+                        <p>Choose a run date and state, then load the corresponding temperature graphics.</p>
+                    </div>
+                    <form class="filters" method="get">
+                        <div class="field">
+                            <label for="date">Run date</label>
+                            <select id="date" name="date">
+                                {% for date in available_dates %}
+                                <option value="{{ date }}" {% if date == selected_date %}selected{% endif %}>{{ date }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="state">State coverage</label>
+                            <select id="state" name="state">
+                                {% for state in state_options %}
+                                <option value="{{ state.key }}" {% if state.key == selected_state %}selected{% endif %}>{{ state.label }}{% if not state.supported %} (not in current HRRR workflow){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="panel-actions"><button type="submit">Load Plots</button></div>
+                    </form>
+                    {% if selected_state %}
+                    <div class="panel-note"><strong>Current scope</strong><span>Viewing {{ selected_state_label }}. This workflow is currently limited to the Northeast state set available in the selector.</span></div>
+                    {% endif %}
+                </aside>
+            </div>
+        </section>
+        <section class="content-grid">
+            <div class="main-column">
+                {% if plots %}
+                <section class="section-card">
+                    <div class="section-header">
+                        <div>
+                            <span class="section-kicker">Active gallery</span>
+                            <h2>{{ selected_state_label or 'Selected State' }} plots for {{ selected_date }}</h2>
+                            <p>Every card opens the original image in a new tab for close inspection.</p>
+                        </div>
+                        <div class="meta-copy">{{ plots|length }} plot{% if plots|length != 1 %}s{% endif %} loaded</div>
+                    </div>
+                    <div class="plot-grid">
+                        {% for plot in plots %}
+                        <a class="plot-card" href="{{ plot.url }}" target="_blank" rel="noreferrer">
+                            <div class="plot-card-head"><h3>{{ plot.label }}</h3><span class="plot-tag">PNG</span></div>
+                            <figure class="plot-figure"><div class="plot-image-wrap"><img src="{{ plot.url }}" alt="{{ plot.label }}"></div></figure>
+                            <div class="plot-card-foot"><span>Open full resolution</span><strong>Inspect image</strong></div>
+                        </a>
                         {% endfor %}
                     </div>
-                    <div class="toolbar-actions">
-                        <button type="submit">Download Checked Dates</button>
-                        <a class="download-link" href="/downloads/raw-grib.zip?all=1">Download All Dates</a>
+                </section>
+                {% else %}
+                <section class="empty">
+                    <div class="empty-icon">!</div>
+                    <h2>No plots available yet</h2>
+                    <p>{% if selected_date %}No plots were found for {{ selected_state_label or 'the selected state' }} on {{ selected_date }}.{% else %}No dated output folders were found yet. Run the HRRR download script first so it writes into /var/data/output.{% endif %}</p>
+                </section>
+                {% endif %}
+                {% if downloadable_dates %}
+                <section class="download-panel">
+                    <div class="section-header">
+                        <div>
+                            <span class="section-kicker">Raw model files</span>
+                            <h2>Build a custom GRIB archive</h2>
+                            <p>Select one or more dates to generate a zip from the preserved raw inputs.</p>
+                        </div>
+                        <div class="meta-copy">{{ downloadable_dates|length }} archived date{% if downloadable_dates|length != 1 %}s{% endif %}</div>
                     </div>
-                </form>
-            </section>
-            {% endif %}
+                    <form class="download-form" method="get" action="/downloads/raw-grib.zip">
+                        <div class="download-options">
+                            {% for date in downloadable_dates %}
+                            <label class="download-option" for="download-date-{{ date }}"><span>{{ date }}</span><input id="download-date-{{ date }}" type="checkbox" name="date" value="{{ date }}" {% if date == selected_date %}checked{% endif %}></label>
+                            {% endfor %}
+                        </div>
+                        <div class="download-actions">
+                            <button type="submit">Download Checked Dates</button>
+                            <a class="download-link" href="/downloads/raw-grib.zip?all=1">Download All Dates</a>
+                        </div>
+                    </form>
+                </section>
+                {% endif %}
+            </div>
+            <aside class="sidebar">
+                <section class="sidebar-card">
+                    <h2>Session Snapshot</h2>
+                    <p>Quick context for the current archive view.</p>
+                    <div class="meta-list">
+                        <div class="meta-item"><span class="meta-label">Primary date</span><strong class="meta-value">{{ selected_date or 'No selection' }}</strong></div>
+                        <div class="meta-item"><span class="meta-label">Geographic scope</span><strong class="meta-value">{{ selected_state_label or 'Unavailable' }}</strong></div>
+                        <div class="meta-item"><span class="meta-label">Downloadable archive</span><strong class="meta-value">{% if raw_grib_available %}Ready{% else %}Unavailable{% endif %}</strong></div>
+                    </div>
+                </section>
+                {% if available_dates %}
+                <section class="sidebar-card">
+                    <h2>Date Archive</h2>
+                    <p>Newest runs appear first. Use the main filter panel to switch the gallery.</p>
+                    <div class="timeline">
+                        {% for date in available_dates[:6] %}
+                        <div class="timeline-item"><strong>{{ date }}</strong><span>{% if date == selected_date %}Currently selected{% else %}Archived output set{% endif %}</span></div>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endif %}
+                <section class="sidebar-card">
+                    <h2>State Coverage</h2>
+                    <p>Reference the configured state list without leaving the dashboard.</p>
+                    <select class="sidebar-select" aria-label="Configured states" disabled>
+                        {% for state in state_options %}
+                        <option {% if state.key == selected_state %}selected{% endif %}>{{ state.label }}{% if not state.supported %} (not in current HRRR workflow){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="download-list">
+                        <div class="download-item"><strong>Products view</strong><span>Use the navigation above to open USA trend maps.</span></div>
+                        <div class="download-item"><strong>Archive handling</strong><span>GRIB downloads preserve existing backend packaging behavior.</span></div>
+                    </div>
+                </section>
+            </aside>
         </section>
-
-        {% if plots %}
-        <section class="grid">
-            {% for plot in plots %}
-            <article class="card">
-                <header>
-                    <h2>{{ plot.label }}</h2>
-                </header>
-                <a href="{{ plot.url }}" target="_blank" rel="noreferrer">
-                    <img src="{{ plot.url }}" alt="{{ plot.label }}">
-                </a>
-            </article>
-            {% endfor %}
-        </section>
-        {% else %}
-        <section class="empty">
-            {% if selected_date %}
-            No plots were found for {{ selected_state_label or 'the selected state' }} on {{ selected_date }}.
-            {% else %}
-            No dated output folders were found yet. Run the HRRR download script first so it writes into /var/data/output.
-            {% endif %}
-        </section>
-        {% endif %}
+        <footer class="footer">
+            <span><strong>HRRR Plot Viewer</strong> presents archived state graphics and raw GRIB downloads through the existing Flask workflow.</span>
+            {% if available_dates %}<span>{{ available_dates|length }} available date{% if available_dates|length != 1 %}s{% endif %} in the current archive.</span>{% endif %}
+        </footer>
     </main>
 </body>
 </html>
