@@ -97,11 +97,7 @@ def format_duration(duration_seconds: float | None) -> str:
     total_seconds = int(round(duration_seconds))
     minutes, seconds = divmod(total_seconds, 60)
     hours, minutes = divmod(minutes, 60)
-    if hours:
-        return f"{hours}h {minutes}m {seconds}s"
-    if minutes:
-        return f"{minutes}m {seconds}s"
-    return f"{seconds}s"
+    return f"{hours}h {minutes}m {seconds}s"
 
 
 def get_run_history() -> list[dict[str, str | float | int | None | list[dict[str, str | float | int | None]]]]:
