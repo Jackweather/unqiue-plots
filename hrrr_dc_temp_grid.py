@@ -3,9 +3,10 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import time
+from zoneinfo import ZoneInfo
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,6 +30,7 @@ GEOCODER_RETRY_BASE_SECONDS = 2
 LOCATIONS: dict[str, dict[str, str | float]] | None = None
 LOCATION_BOUNDS: tuple[float, float, float, float] | None = None
 ACTIVE_LOCATION_SPECS: list[dict[str, str | None]] | None = None
+EASTERN_TIMEZONE = ZoneInfo("America/New_York")
 
 
 @dataclass(frozen=True)
@@ -307,6 +309,53 @@ def load_or_download_grib(
     return save_raw_grib(response.content, raw_dir, cycle_hour, forecast_hour)
 
 
+def resolve_latest_cycle(target_date: datetime, now_utc: datetime) -> int:
+    if target_date.date() < now_utc.date():
+        return 23
+
+    eastern_now = now_utc.astimezone(EASTERN_TIMEZONE)
+    if eastern_now.hour in {20, 21}:
+        return 23
+
+    return now_utc.hour
+
+
+def resolve_run_date_and_latest_cycle(requested_date_str: str, now_utc: datetime) -> tuple[str, int]:
+    requested_date = datetime.strptime(requested_date_str, DEFAULT_DATE_FORMAT).replace(tzinfo=timezone.utc)
+    eastern_now = now_utc.astimezone(EASTERN_TIMEZONE)
+    current_utc_date_str = now_utc.strftime(DEFAULT_DATE_FORMAT)
+
+    if requested_date_str == current_utc_date_str and eastern_now.hour in {20, 21}:
+        prior_utc_date = (now_utc - timedelta(days=1)).strftime(DEFAULT_DATE_FORMAT)
+        return prior_utc_date, 23
+
+    return requested_date_str, resolve_latest_cycle(requested_date, now_utc)
+
+
+def prefetch_gribs(
+    session: requests.Session,
+    date_str: str,
+    latest_cycle: int,
+    max_forecast_hour: int,
+    timeout: int,
+    raw_dir: Path,
+) -> None:
+    print("Downloading HRRR files before processing", flush=True)
+    for cycle_hour in range(0, latest_cycle + 1):
+        print(f"Prefetching run {cycle_hour:02d}z", flush=True)
+        miss_streak = 0
+        for forecast_hour in range(0, max_forecast_hour + 1):
+            grib_file = load_or_download_grib(session, date_str, cycle_hour, forecast_hour, timeout, raw_dir)
+            if grib_file is None:
+                print(f"  no data for {cycle_hour:02d}z f{forecast_hour:02d}", flush=True)
+                miss_streak += 1
+                if forecast_hour == 0 or miss_streak >= 2:
+                    break
+                continue
+
+            miss_streak = 0
+
+
 def try_fetch_record(
     cycle_hour: int,
     forecast_hour: int,
@@ -345,20 +394,25 @@ def try_fetch_record(
 
 
 def collect_records(date_str: str, max_forecast_hour: int, timeout: int, raw_dir: Path) -> list[RunRecord]:
-    target_date = datetime.strptime(date_str, DEFAULT_DATE_FORMAT).replace(tzinfo=timezone.utc)
     now_utc = datetime.now(timezone.utc)
-    latest_cycle = 23 if target_date.date() < now_utc.date() else now_utc.hour
+    resolved_date_str, latest_cycle = resolve_run_date_and_latest_cycle(date_str, now_utc)
     effective_max_forecast_hour = min(max_forecast_hour, DEFAULT_MAX_FORECAST_HOUR)
     session = requests.Session()
     session.headers.update({"User-Agent": "hrrr-dc-temp-grid/1.0"})
 
+    prefetch_gribs(session, resolved_date_str, latest_cycle, effective_max_forecast_hour, timeout, raw_dir)
+
     records: list[RunRecord] = []
     for cycle_hour in range(0, latest_cycle + 1):
-        print(f"Checking run {cycle_hour:02d}z", flush=True)
+        print(f"Processing run {cycle_hour:02d}z", flush=True)
         cycle_records: list[RunRecord] = []
         miss_streak = 0
         for forecast_hour in range(0, effective_max_forecast_hour + 1):
-            grib_file = load_or_download_grib(session, date_str, cycle_hour, forecast_hour, timeout, raw_dir)
+            run_dir = get_run_grib_dir(raw_dir, cycle_hour)
+            grib_file = run_dir / f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.tmp2m.grib2"
+            if not grib_file.exists():
+                legacy_grib_file = raw_dir / f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.tmp2m.grib2"
+                grib_file = legacy_grib_file if legacy_grib_file.exists() else None
             if grib_file is None:
                 print(f"  no data for {cycle_hour:02d}z f{forecast_hour:02d}", flush=True)
                 miss_streak += 1
@@ -366,7 +420,7 @@ def collect_records(date_str: str, max_forecast_hour: int, timeout: int, raw_dir
                     break
                 continue
 
-            records_for_hour = try_fetch_record(cycle_hour, forecast_hour, date_str, grib_file)
+            records_for_hour = try_fetch_record(cycle_hour, forecast_hour, resolved_date_str, grib_file)
             cycle_records.extend(records_for_hour)
             print("  saved " + ", ".join(
                 f"{record.location_key} {record.valid_time:%HZ} {record.temperature_f:.1f}F"
@@ -464,10 +518,12 @@ def write_heatmap(grid: pd.DataFrame, png_path: Path, date_str: str, location_la
 def main() -> None:
     args = parse_args()
     configure_runtime(args.max_locations_per_state, args.cache_dir)
+    now_utc = datetime.now(timezone.utc)
+    resolved_date_str, _ = resolve_run_date_and_latest_cycle(args.date, now_utc)
     output_dir = Path(args.output_dir)
-    raw_dir = output_dir / args.date / "raw_grib"
+    raw_dir = output_dir / resolved_date_str / "raw_grib"
 
-    print(f"Starting HRRR temperature grid run for {args.date}", flush=True)
+    print(f"Starting HRRR temperature grid run for {resolved_date_str}", flush=True)
     print(f"Output directory: {output_dir}", flush=True)
     print(f"Cache directory: {args.cache_dir}", flush=True)
     print(f"Max locations per state: {args.max_locations_per_state}", flush=True)
@@ -481,11 +537,11 @@ def main() -> None:
             flush=True,
         )
 
-    records = collect_records(args.date, args.max_forecast_hour, args.timeout, raw_dir)
+    records = collect_records(resolved_date_str, args.max_forecast_hour, args.timeout, raw_dir)
     if not records:
         raise SystemExit("No HRRR runs were available for the requested UTC date.")
 
-    output_paths, tidy_csv_path = build_outputs(records, output_dir, args.date)
+    output_paths, tidy_csv_path = build_outputs(records, output_dir, resolved_date_str)
     print(f"Saved raw GRIB files in: {raw_dir}")
     print(f"Saved tidy CSV: {tidy_csv_path}")
     for output_path in output_paths:
