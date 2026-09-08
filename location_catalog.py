@@ -2,11 +2,13 @@ from __future__ import annotations
 
 ENABLED_STATE_KEYS = (
     "new_york",
+    "district_of_columbia",
     "maryland",
     "new_jersey",
     "connecticut",
     "maine",
     "massachusetts",
+    "new_hampshire",
     "vermont",
 )
 
@@ -50,6 +52,11 @@ STATE_CITY_GROUPS = {
         "label": "Delaware",
         "model_domain": "conus",
         "cities": [("wilmington", "Wilmington", "North"), ("dover", "Dover", "Central"), ("georgetown", "Georgetown", "South"), ("rehoboth_beach", "Rehoboth Beach", "Southeast")],
+    },
+    "district_of_columbia": {
+        "label": "District of Columbia",
+        "model_domain": "conus",
+        "cities": [("washington", "Washington", "District")],
     },
     "florida": {
         "label": "Florida",
@@ -169,7 +176,7 @@ STATE_CITY_GROUPS = {
     "new_york": {
         "label": "New York",
         "model_domain": "conus",
-        "cities": [("buffalo", "Buffalo", "West"), ("syracuse", "Syracuse", "Central"), ("albany", "Albany", "East"), ("new_york_city", "New York City", "Southeast")],
+        "cities": [("buffalo", "Buffalo", "West"), ("syracuse", "Syracuse", "Central"), ("albany", "Albany", "East"), ("new_york_city", "New York City", "Southeast"), ("lake_placid", "Lake Placid", "North")],
     },
     "north_carolina": {
         "label": "North Carolina",
@@ -234,7 +241,7 @@ STATE_CITY_GROUPS = {
     "vermont": {
         "label": "Vermont",
         "model_domain": "conus",
-        "cities": [("st_albans", "St. Albans", "Northwest"), ("newport", "Newport", "Northeast"), ("burlington", "Burlington", "West/North"), ("brattleboro", "Brattleboro", "Southeast")],
+        "cities": [("st_albans", "St. Albans", "Northwest"), ("newport", "Newport", "Northeast"), ("burlington", "Burlington", "West/North"), ("rutland", "Rutland", "South/Central"), ("brattleboro", "Brattleboro", "Southeast")],
     },
     "virginia": {
         "label": "Virginia",
