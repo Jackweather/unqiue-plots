@@ -31,10 +31,19 @@ def resolve_script_path(render_script: str, local_script: str) -> tuple[str, str
     return str(local_path), str(local_path.parent)
 
 
+def format_duration(duration_seconds: float) -> str:
+    total_seconds = int(round(duration_seconds))
+    minutes, seconds = divmod(total_seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m {seconds}s"
+
+
 def run_scripts(scripts: list[tuple[str, str]], task_run_id: str, max_parallel: int = 1) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     semaphore = threading.Semaphore(max_parallel)
     threads: list[threading.Thread] = []
+    result_lock = threading.Lock()
+    run_results: list[tuple[str, float]] = []
 
     def run_one(script_path: str, working_dir: str) -> None:
         started_at = datetime.now()
@@ -66,6 +75,8 @@ def run_scripts(scripts: list[tuple[str, str]], task_run_id: str, max_parallel: 
                 log_file.write(f"Duration seconds: {duration_seconds:.2f}\n")
                 log_file.write(f"\nExit code: {process.returncode}\n")
                 log_file.flush()
+                with result_lock:
+                    run_results.append((Path(script_path).name, duration_seconds))
                 print(f"[{Path(script_path).name}] Exit code: {process.returncode}", flush=True)
 
     for script_path, working_dir in scripts:
@@ -75,6 +86,13 @@ def run_scripts(scripts: list[tuple[str, str]], task_run_id: str, max_parallel: 
 
     for worker in threads:
         worker.join()
+
+    summary_log_path = LOG_DIR / f"{task_run_id}_summary.log"
+    with summary_log_path.open("w", encoding="utf-8") as summary_log:
+        summary_log.write(f"Task run id: {task_run_id}\n")
+        summary_log.write("Script durations:\n")
+        for script_name, duration_seconds in run_results:
+            summary_log.write(f"{script_name}: {format_duration(duration_seconds)}\n")
 
 
 def get_date_directories() -> list[Path]:
@@ -264,7 +282,6 @@ def usa_trends() -> str:
 
 @app.route("/run-task1")
 def run_task1():
-    task_run_id = datetime.now().strftime("task1_%Y%m%d_%H%M%S_%f")
     scripts = [
         resolve_script_path(
             "/opt/render/project/src/hrrr_dc_temp_grid.py",
@@ -275,6 +292,7 @@ def run_task1():
             "hrrr_usa_temp_trend_map.py",
         ),
     ]
+    task_run_id = datetime.now().strftime("task1_%Y%m%d_%H%M%S_%f")
     threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
     return f"Task started in background as {task_run_id}.", 200
 
