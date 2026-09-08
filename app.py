@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import threading
+from zoneinfo import ZoneInfo
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from flask import Flask, abort, render_template, request, send_file, send_from_directory
@@ -18,6 +19,7 @@ DATA_DIR = Path("/var/data")
 OUTPUT_DIR = DATA_DIR / "output"
 LOG_DIR = DATA_DIR / "logs"
 RENDER_BASE_DIR = Path("/opt/render/project/src/")
+EASTERN_TIMEZONE = ZoneInfo("America/New_York")
 
 app = Flask(__name__)
 
@@ -29,6 +31,17 @@ def resolve_script_path(render_script: str, local_script: str) -> tuple[str, str
 
     local_path = BASE_DIR / local_script
     return str(local_path), str(local_path.parent)
+
+
+def get_summary_log_dir() -> Path:
+    if RENDER_BASE_DIR.exists():
+        return RENDER_BASE_DIR
+    return BASE_DIR
+
+
+def build_task_run_id(now: datetime | None = None) -> str:
+    eastern_now = (now or datetime.now(EASTERN_TIMEZONE)).astimezone(EASTERN_TIMEZONE)
+    return eastern_now.strftime("task1_%y%m%d_%I_%M_%S%p").lower()
 
 
 def format_duration(duration_seconds: float) -> str:
@@ -44,16 +57,17 @@ def run_scripts(scripts: list[tuple[str, str]], task_run_id: str, max_parallel: 
     threads: list[threading.Thread] = []
     result_lock = threading.Lock()
     run_results: list[tuple[str, float]] = []
+    summary_log_path = get_summary_log_dir() / f"{task_run_id}.log"
+    log_lock = threading.Lock()
 
     def run_one(script_path: str, working_dir: str) -> None:
-        started_at = datetime.now()
-        log_stamp = started_at.strftime("%Y%m%d_%H%M%S_%f")
-        log_path = LOG_DIR / f"{task_run_id}_{Path(script_path).stem}_{log_stamp}.log"
         with semaphore:
-            with log_path.open("w", encoding="utf-8") as log_file:
-                log_file.write(f"Task run id: {task_run_id}\n")
-                log_file.write(f"Started at: {started_at.isoformat()}\n")
-                log_file.flush()
+            started_at = datetime.now()
+            with summary_log_path.open("a", encoding="utf-8") as log_file:
+                with log_lock:
+                    log_file.write(f"Task run id: {task_run_id}\n")
+                    log_file.write(f"Starting {Path(script_path).name}: {started_at.isoformat()}\n")
+                    log_file.flush()
                 process = subprocess.Popen(
                     ["python", script_path],
                     cwd=working_dir,
@@ -65,16 +79,18 @@ def run_scripts(scripts: list[tuple[str, str]], task_run_id: str, max_parallel: 
                 for line in process.stdout:
                     sys.stdout.write(line)
                     sys.stdout.flush()
-                    log_file.write(line)
-                    log_file.flush()
+                    with log_lock:
+                        log_file.write(line)
+                        log_file.flush()
 
                 process.wait()
                 finished_at = datetime.now()
                 duration_seconds = (finished_at - started_at).total_seconds()
-                log_file.write(f"Finished at: {finished_at.isoformat()}\n")
-                log_file.write(f"Duration seconds: {duration_seconds:.2f}\n")
-                log_file.write(f"\nExit code: {process.returncode}\n")
-                log_file.flush()
+                with log_lock:
+                    log_file.write(f"Finished {Path(script_path).name}: {finished_at.isoformat()}\n")
+                    log_file.write(f"Duration {Path(script_path).name}: {format_duration(duration_seconds)}\n")
+                    log_file.write(f"Exit code {Path(script_path).name}: {process.returncode}\n\n")
+                    log_file.flush()
                 with result_lock:
                     run_results.append((Path(script_path).name, duration_seconds))
                 print(f"[{Path(script_path).name}] Exit code: {process.returncode}", flush=True)
@@ -87,9 +103,7 @@ def run_scripts(scripts: list[tuple[str, str]], task_run_id: str, max_parallel: 
     for worker in threads:
         worker.join()
 
-    summary_log_path = LOG_DIR / f"{task_run_id}_summary.log"
-    with summary_log_path.open("w", encoding="utf-8") as summary_log:
-        summary_log.write(f"Task run id: {task_run_id}\n")
+    with summary_log_path.open("a", encoding="utf-8") as summary_log:
         summary_log.write("Script durations:\n")
         for script_name, duration_seconds in run_results:
             summary_log.write(f"{script_name}: {format_duration(duration_seconds)}\n")
@@ -282,6 +296,7 @@ def usa_trends() -> str:
 
 @app.route("/run-task1")
 def run_task1():
+    task_run_id = build_task_run_id()
     scripts = [
         resolve_script_path(
             "/opt/render/project/src/hrrr_dc_temp_grid.py",
@@ -292,7 +307,6 @@ def run_task1():
             "hrrr_usa_temp_trend_map.py",
         ),
     ]
-    task_run_id = datetime.now().strftime("task1_%Y%m%d_%H%M%S_%f")
     threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
     return f"Task started in background as {task_run_id}.", 200
 
