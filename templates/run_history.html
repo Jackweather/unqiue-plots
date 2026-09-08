@@ -54,14 +54,6 @@
             color: var(--muted);
         }
 
-        .table-shell {
-            margin-top: 20px;
-            overflow-x: auto;
-            border: 1px solid var(--line);
-            border-radius: 18px;
-            background: rgba(255, 255, 255, 0.82);
-        }
-
         .task-block {
             margin-top: 20px;
             border: 1px solid var(--line);
@@ -88,44 +80,30 @@
             color: var(--muted);
         }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
+        .task-list {
+            padding: 6px 0;
         }
 
-        th,
-        td {
-            padding: 14px 16px;
-            text-align: left;
-            border-bottom: 1px solid var(--line);
-            white-space: nowrap;
+        .task-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 16px;
+            align-items: center;
+            padding: 14px 20px;
+            border-top: 1px solid var(--line);
         }
 
-        th {
-            font-size: 0.85rem;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            color: var(--muted);
-            background: rgba(25, 95, 87, 0.08);
+        .task-row:first-child {
+            border-top: 0;
         }
 
-        tr:last-child td {
-            border-bottom: 0;
-        }
-
-        .status-ok {
-            color: var(--ok);
+        .script-name {
             font-weight: 700;
         }
 
-        .status-fail {
-            color: var(--fail);
-            font-weight: 700;
-        }
-
-        .status-running {
+        .duration {
             color: var(--accent);
-            font-weight: 700;
+            font-variant-numeric: tabular-nums;
         }
 
         .empty {
@@ -142,7 +120,7 @@
     <main>
         <section class="hero">
             <h1>Run History</h1>
-            <p>Hidden diagnostics page for script runtimes. Each section represents one /run-task1 launch and lists the scripts that ran inside it.</p>
+            <p>Hidden diagnostics page for script runtimes. Each section represents one /run-task1 launch and lists each Python file with its elapsed time.</p>
         </section>
 
         {% if run_history %}
@@ -154,51 +132,17 @@
                     <span>{{ task.task_run_id }}</span>
                 </div>
                 <div>
-                    <strong>Started</strong>
-                    <span>{{ task.started_at or 'Unknown' }}</span>
-                </div>
-                <div>
-                    <strong>Finished</strong>
-                    <span>{{ task.finished_at or 'Running' }}</span>
-                </div>
-                <div>
                     <strong>Total Script Time</strong>
                     <span>{{ task.duration_label }}</span>
                 </div>
             </div>
-            <div class="table-shell">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Script</th>
-                            <th>Started</th>
-                            <th>Finished</th>
-                            <th>Duration</th>
-                            <th>Exit Code</th>
-                            <th>Log File</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for run in task.runs %}
-                        <tr>
-                            <td>{{ run.script_name }}</td>
-                            <td>{{ run.started_at or 'Unknown' }}</td>
-                            <td>{{ run.finished_at or 'Running' }}</td>
-                            <td>{{ run.duration_label }}</td>
-                            <td>
-                                {% if run.exit_code is none %}
-                                <span class="status-running">Running</span>
-                                {% elif run.exit_code == 0 %}
-                                <span class="status-ok">{{ run.exit_code }}</span>
-                                {% else %}
-                                <span class="status-fail">{{ run.exit_code }}</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ run.log_name }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <div class="task-list">
+                {% for run in task.runs %}
+                <div class="task-row">
+                    <span class="script-name">{{ run.script_name }}</span>
+                    <span class="duration">{{ run.duration_label }}</span>
+                </div>
+                {% endfor %}
             </div>
         </section>
         {% endfor %}
