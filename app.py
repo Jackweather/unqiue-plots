@@ -275,8 +275,8 @@ def download_raw_grib_archive():
     )
 
 
-@app.route("/usa-trends")
-def usa_trends() -> str:
+@app.route("/products-maps")
+def products_maps() -> str:
     date_dirs = get_date_directories()
     requested_date = request.args.get("date")
     selected_dir = next((path for path in date_dirs if path.name == requested_date), None)
@@ -287,7 +287,7 @@ def usa_trends() -> str:
     trend_plots = get_usa_trend_entries(selected_dir)
 
     return render_template(
-        "usa_trends.html",
+        "products_maps.html",
         available_dates=[path.name for path in date_dirs],
         selected_date=selected_date,
         trend_plots=trend_plots,
