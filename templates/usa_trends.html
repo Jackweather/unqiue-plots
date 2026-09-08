@@ -229,14 +229,13 @@
                 <h1>USA Temperature Trend Maps</h1>
                 <p>Browse USA trend maps by date, starting with the most recent run.</p>
             </div>
-            <form class="toolbar" method="get">
+            <form id="date-filter-form" class="toolbar" method="get">
                 <label for="date">Date</label>
                 <select id="date" name="date">
                     {% for date in available_dates %}
                     <option value="{{ date }}" {% if date == selected_date %}selected{% endif %}>{{ date }}</option>
                     {% endfor %}
                 </select>
-                <button type="submit">View Maps</button>
                 <a class="home-link" href="/">Graphs</a>
             </form>
         </section>
@@ -342,6 +341,10 @@
 
             slider.addEventListener("input", (event) => {
                 renderPlot(Number(event.target.value));
+            });
+
+            document.getElementById("date")?.addEventListener("change", () => {
+                document.getElementById("date-filter-form")?.requestSubmit();
             });
 
             updateSliderBounds();
