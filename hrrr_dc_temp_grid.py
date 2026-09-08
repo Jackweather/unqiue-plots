@@ -22,7 +22,7 @@ DEFAULT_DATE_FORMAT = "%Y%m%d"
 DEFAULT_OUTPUT_DIR = "/var/data/output"
 DEFAULT_CACHE_DIR = "/var/data"
 DEFAULT_MAX_FORECAST_HOUR = 18
-DEFAULT_MAX_LOCATIONS_PER_STATE = 1
+DEFAULT_MAX_LOCATIONS_PER_STATE = 0
 GEOCODE_CACHE_FILE = "location_coordinates.json"
 GEOCODER_URL = "https://nominatim.openstreetmap.org/search"
 GEOCODER_MAX_ATTEMPTS = 5
@@ -82,7 +82,7 @@ def parse_args() -> argparse.Namespace:
         "--max-locations-per-state",
         type=int,
         default=DEFAULT_MAX_LOCATIONS_PER_STATE,
-        help="Number of cities to process per supported state. Default is 1 for faster runs.",
+        help="Number of cities to process per supported state. Use 0 to process all configured cities; 0 is the default.",
     )
     parser.add_argument(
         "--cache-dir",
