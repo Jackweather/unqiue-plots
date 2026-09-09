@@ -61,6 +61,9 @@
         th, td { padding: 12px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
         th { background: var(--surface-alt); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
         tr:last-child td { border-bottom: 0; }
+        .nowrap {
+            white-space: nowrap;
+        }
         .code-block {
             margin: 0; padding: 16px; border-radius: 18px; background: #0f172a; color: #e2e8f0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 0.9rem/1.5 "Cascadia Code", Consolas, monospace;
         }
@@ -156,10 +159,10 @@
                         <tbody>
                             {% for item in summary.variables %}
                             <tr>
-                                <td>{{ item.name }}</td>
-                                <td>{{ item.dims|join(', ') }}</td>
-                                <td>{{ item.shape|join(' x ') }}</td>
-                                <td>{{ item.dtype }}</td>
+                                <td class="nowrap">{{ item.name }}</td>
+                                <td class="nowrap">{{ item.dims|join(', ') }}</td>
+                                <td class="nowrap">{{ item.shape|join(' x ') }}</td>
+                                <td class="nowrap">{{ item.dtype }}</td>
                                 <td><pre class="code-block">{{ item.attrs }}</pre></td>
                             </tr>
                             {% endfor %}
