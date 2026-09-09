@@ -90,15 +90,16 @@
                 <p class="meta">Dataset Inspector</p>
                 <h1 style="margin: 4px 0 0; font-size: 1.5rem;">GRIB Dataset Summary</h1>
             </div>
-            <a class="back-link" href="/?date={{ selected_date }}">Back to Archive</a>
+            <a class="back-link" href="/?product={{ selected_product }}&date={{ selected_date }}">Back to Archive</a>
         </div>
 
         <section class="hero">
             <div class="hero-copy">
-                <h1>{{ run_name|upper }} dataset preview</h1>
+                <h1>{{ selected_product_label }} | {{ run_name|upper }} dataset preview</h1>
                 <p>Showing a quick summary from the first GRIB file in this run folder so you can inspect what fields and dimensions are inside the dataset.</p>
             </div>
             <div class="stats">
+                <div class="stat"><span>Dataset</span><strong>{{ selected_product_label }}</strong></div>
                 <div class="stat"><span>Date</span><strong>{{ selected_date }}</strong></div>
                 <div class="stat"><span>Run</span><strong>{{ run_name }}</strong></div>
                 <div class="stat"><span>Files in run</span><strong>{{ file_count }}</strong></div>
