@@ -44,17 +44,33 @@
         .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 20px; }
         .stat { padding: 16px 18px; border-radius: 18px; background: var(--surface-alt); border: 1px solid var(--line); }
         .stat span { display: block; color: var(--muted); font-size: 0.84rem; }
-        .stat strong { display: block; margin-top: 8px; font-size: 1.2rem; }
+        .stat strong { display: block; margin-top: 8px; font-size: 1.2rem; line-height: 1.4; }
+        .stat-file {
+            font-size: 1rem;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
         .panel { padding: 24px; display: grid; gap: 22px; }
         .group { display: grid; gap: 12px; }
         .group + .group { padding-top: 20px; border-top: 1px solid var(--line); }
+        .group-head {
+            align-items: end;
+        }
         .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 18px; }
         table { width: 100%; border-collapse: collapse; background: #fff; }
         th, td { padding: 12px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
         th { background: var(--surface-alt); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
         tr:last-child td { border-bottom: 0; }
         .code-block {
-            margin: 0; padding: 16px; border-radius: 18px; background: #0f172a; color: #e2e8f0; overflow: auto; font: 0.9rem/1.5 "Cascadia Code", Consolas, monospace;
+            margin: 0; padding: 16px; border-radius: 18px; background: #0f172a; color: #e2e8f0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 0.9rem/1.5 "Cascadia Code", Consolas, monospace;
+        }
+        .table-note {
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: var(--surface-alt);
+            border: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 0.92rem;
         }
         .error { color: var(--danger); }
         .empty { padding: 30px; text-align: center; }
@@ -83,7 +99,7 @@
                 <div class="stat"><span>Date</span><strong>{{ selected_date }}</strong></div>
                 <div class="stat"><span>Run</span><strong>{{ run_name }}</strong></div>
                 <div class="stat"><span>Files in run</span><strong>{{ file_count }}</strong></div>
-                <div class="stat"><span>Preview file</span><strong>{{ selected_file }}</strong></div>
+                <div class="stat"><span>Preview file</span><strong class="stat-file">{{ selected_file }}</strong></div>
             </div>
         </section>
 
@@ -133,6 +149,7 @@
                     <h2>Data Variables</h2>
                     <p>{{ summary.variables|length }} total</p>
                 </div>
+                <div class="table-note">Attributes are trimmed to the first few metadata entries so the table stays readable.</div>
                 <div class="table-wrap">
                     <table>
                         <thead><tr><th>Name</th><th>Dims</th><th>Shape</th><th>Dtype</th><th>Attrs</th></tr></thead>
