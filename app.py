@@ -23,6 +23,24 @@ EASTERN_TIMEZONE = ZoneInfo("America/New_York")
 
 app = Flask(__name__)
 
+PRODUCTS = {
+    "temp_2m": {
+        "label": "2 m Temperature",
+        "short_label": "Temperature",
+        "archive_dir": "raw_grib",
+        "script": "hrrr_grib_2m_sfc_archive.py",
+        "render_script": "/opt/render/project/src/hrrr_grib_2m_sfc_archive.py",
+    },
+    "total_precip": {
+        "label": "Total Precipitation",
+        "short_label": "Total Precip",
+        "archive_dir": "raw_grib_total_precip",
+        "script": "hrrr_grib_total_precip_sfc_archive.py",
+        "render_script": "/opt/render/project/src/hrrr_grib_total_precip_sfc_archive.py",
+    },
+}
+DEFAULT_PRODUCT_KEY = "temp_2m"
+
 
 def resolve_script_path(render_script: str, local_script: str) -> tuple[str, str]:
     render_path = Path(render_script)
@@ -119,8 +137,13 @@ def get_date_directories() -> list[Path]:
     )
 
 
-def list_raw_grib_runs(date_str: str) -> list[dict[str, str | int]]:
-    raw_dir = get_raw_grib_dir(date_str)
+def get_product_config(product_key: str | None) -> tuple[str, dict[str, str]]:
+    normalized_key = product_key if product_key in PRODUCTS else DEFAULT_PRODUCT_KEY
+    return normalized_key, PRODUCTS[normalized_key]
+
+
+def list_raw_grib_runs(date_str: str, product_key: str) -> list[dict[str, str | int]]:
+    raw_dir = get_raw_grib_dir(date_str, product_key)
     if not raw_dir.exists():
         return []
 
@@ -137,8 +160,8 @@ def list_raw_grib_runs(date_str: str) -> list[dict[str, str | int]]:
     return runs
 
 
-def get_run_files(date_str: str, run_name: str) -> list[Path]:
-    run_dir = get_raw_grib_dir(date_str) / run_name
+def get_run_files(date_str: str, run_name: str, product_key: str) -> list[Path]:
+    run_dir = get_raw_grib_dir(date_str, product_key) / run_name
     if not run_dir.exists() or not run_dir.is_dir():
         return []
     return sorted(run_dir.glob("*.grib2"))
@@ -184,12 +207,15 @@ def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
         }
 
 
-def get_raw_grib_dir(date_str: str) -> Path:
-    return OUTPUT_DIR / date_str / "raw_grib"
+def get_raw_grib_dir(date_str: str, product_key: str) -> Path:
+    _, product = get_product_config(product_key)
+    return OUTPUT_DIR / date_str / product["archive_dir"]
 
 
 def get_downloadable_dates(date_dirs: list[Path], requested_dates: list[str], include_all: bool) -> list[str]:
-    available_dates = [path.name for path in date_dirs if get_raw_grib_dir(path.name).exists()]
+    product_key = request.args.get("product")
+    normalized_key, _ = get_product_config(product_key)
+    available_dates = [path.name for path in date_dirs if get_raw_grib_dir(path.name, normalized_key).exists()]
     if include_all:
         return available_dates
 
@@ -197,14 +223,14 @@ def get_downloadable_dates(date_dirs: list[Path], requested_dates: list[str], in
     return valid_dates
 
 
-def create_raw_grib_archive(date_strs: list[str]) -> BytesIO:
+def create_raw_grib_archive(date_strs: list[str], product_key: str) -> BytesIO:
     if not date_strs:
         abort(404)
 
     archive_buffer = BytesIO()
     with ZipFile(archive_buffer, "w", compression=ZIP_DEFLATED) as archive:
         for date_str in date_strs:
-            raw_dir = get_raw_grib_dir(date_str)
+            raw_dir = get_raw_grib_dir(date_str, product_key)
             if not raw_dir.exists():
                 continue
 
@@ -223,26 +249,30 @@ def create_raw_grib_archive(date_strs: list[str]) -> BytesIO:
 def index() -> str:
     date_dirs = get_date_directories()
     requested_date = request.args.get("date")
+    selected_product, product = get_product_config(request.args.get("product"))
     selected_dir = next((path for path in date_dirs if path.name == requested_date), None)
     if selected_dir is None and date_dirs:
         selected_dir = date_dirs[0]
 
     selected_date = selected_dir.name if selected_dir else None
-    downloadable_dates = [path.name for path in date_dirs if get_raw_grib_dir(path.name).exists()]
+    downloadable_dates = [path.name for path in date_dirs if get_raw_grib_dir(path.name, selected_product).exists()]
     selected_download_dates = request.args.getlist("download_date")
     selected_download_dates = [date_str for date_str in selected_download_dates if date_str in downloadable_dates]
     if not selected_download_dates and selected_date in downloadable_dates:
         selected_download_dates = [selected_date]
-    run_entries = list_raw_grib_runs(selected_date) if selected_date else []
+    run_entries = list_raw_grib_runs(selected_date, selected_product) if selected_date else []
 
     return render_template(
         "index.html",
         available_dates=[path.name for path in date_dirs],
         selected_date=selected_date,
+        selected_product=selected_product,
+        selected_product_label=product["label"],
+        product_options=[{"key": key, "label": value["label"]} for key, value in PRODUCTS.items()],
         downloadable_dates=downloadable_dates,
         selected_download_dates=selected_download_dates,
         run_entries=run_entries,
-        raw_grib_available=bool(selected_date and get_raw_grib_dir(selected_date).exists()),
+        raw_grib_available=bool(selected_date and get_raw_grib_dir(selected_date, selected_product).exists()),
     )
 
 
@@ -265,16 +295,17 @@ def serve_usa_trend_plot(date_str: str, filename: str):
 @app.route("/downloads/raw-grib.zip")
 def download_raw_grib_archive():
     date_dirs = get_date_directories()
+    selected_product, _ = get_product_config(request.args.get("product"))
     requested_dates = request.args.getlist("date")
     include_all = request.args.get("all") == "1"
     date_strs = get_downloadable_dates(date_dirs, requested_dates, include_all)
-    archive_buffer = create_raw_grib_archive(date_strs)
+    archive_buffer = create_raw_grib_archive(date_strs, selected_product)
     if include_all:
-        download_name = "all_dates_raw_grib.zip"
+        download_name = f"all_dates_{selected_product}_raw_grib.zip"
     elif len(date_strs) == 1:
-        download_name = f"{date_strs[0]}_raw_grib.zip"
+        download_name = f"{date_strs[0]}_{selected_product}_raw_grib.zip"
     else:
-        download_name = f"selected_dates_{len(date_strs)}_raw_grib.zip"
+        download_name = f"selected_dates_{len(date_strs)}_{selected_product}_raw_grib.zip"
 
     return send_file(
         archive_buffer,
@@ -288,7 +319,8 @@ def download_raw_grib_archive():
 def view_grib_dataset() -> str:
     date_str = request.args.get("date", "")
     run_name = request.args.get("run", "")
-    run_files = get_run_files(date_str, run_name)
+    selected_product, product = get_product_config(request.args.get("product"))
+    run_files = get_run_files(date_str, run_name, selected_product)
     if not run_files:
         abort(404)
 
@@ -303,6 +335,8 @@ def view_grib_dataset() -> str:
     return render_template(
         "grib_dataset.html",
         selected_date=date_str,
+        selected_product=selected_product,
+        selected_product_label=product["label"],
         run_name=run_name,
         selected_file=selected_file.name,
         file_count=len(run_files),
@@ -315,10 +349,11 @@ def view_grib_dataset() -> str:
 @app.route("/run-task1")
 def run_task1():
     task_run_id = build_task_run_id()
+    selected_product, product = get_product_config(request.args.get("product"))
     scripts = [
         resolve_script_path(
-            "/opt/render/project/src/hrrr_grib_2m_sfc_archive.py",
-            "hrrr_grib_2m_sfc_archive.py",
+            product["render_script"],
+            product["script"],
         ),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
