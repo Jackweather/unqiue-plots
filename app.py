@@ -145,6 +145,13 @@ def get_run_files(date_str: str, run_name: str) -> list[Path]:
 
 def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
     with xr.open_dataset(grib_path, engine="cfgrib", backend_kwargs={"indexpath": ""}) as ds:
+        dataset_attrs = {key: str(value) for key, value in ds.attrs.items()}
+        if "GRIB_cfName" in dataset_attrs:
+            dataset_attrs["GRIB_cfName"] = dataset_attrs["GRIB_cfName"]
+        source_value = dataset_attrs.get("source")
+        if source_value:
+            dataset_attrs["source"] = Path(source_value).name
+
         return {
             "dimensions": [{"name": name, "size": size} for name, size in ds.sizes.items()],
             "coordinates": [
@@ -161,7 +168,7 @@ def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
                 }
                 for name, variable in ds.data_vars.items()
             ],
-            "attributes": {key: str(value) for key, value in ds.attrs.items()},
+            "attributes": dataset_attrs,
         }
 
 
