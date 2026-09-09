@@ -52,14 +52,14 @@
         .eyebrow { margin: 0; color: var(--accent-deep); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
         .brand-title { margin: 0; font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
         .top-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-        .app-link, .download-link, button {
+        .app-link, .download-link, .inspect-link, button {
             min-height: 44px; border-radius: var(--radius-sm); padding: 0 16px; border: 1px solid transparent; text-decoration: none;
             display: inline-flex; align-items: center; justify-content: center; gap: 10px;
             transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease, color 160ms ease;
         }
-        .app-link, .download-link { background: rgba(255, 255, 255, 0.78); color: var(--ink); border-color: var(--line); box-shadow: var(--shadow-sm); font-weight: 600; }
+        .app-link, .download-link, .inspect-link { background: rgba(255, 255, 255, 0.78); color: var(--ink); border-color: var(--line); box-shadow: var(--shadow-sm); font-weight: 600; }
         button { background: linear-gradient(135deg, var(--accent) 0%, #2e7bff 100%); color: #fff; border-color: rgba(20, 32, 51, 0.06); box-shadow: 0 14px 28px rgba(31, 94, 255, 0.25); cursor: pointer; font-weight: 700; }
-        .app-link:hover, .download-link:hover, button:hover, select:hover, .plot-card:hover { transform: translateY(-1px); }
+        .app-link:hover, .download-link:hover, .inspect-link:hover, button:hover, select:hover, .plot-card:hover { transform: translateY(-1px); }
         .hero {
             position: relative; overflow: hidden; background: linear-gradient(140deg, rgba(20, 32, 51, 0.98) 0%, rgba(23, 62, 166, 0.95) 58%, rgba(14, 104, 171, 0.92) 100%);
             color: #fff; border-radius: var(--radius-lg); padding: 34px; box-shadow: var(--shadow-lg);
@@ -111,6 +111,8 @@
         .archive-card strong { font-size: 1.1rem; letter-spacing: -0.02em; }
         .archive-card span { color: var(--muted); }
         .archive-badge { display: inline-flex; width: fit-content; padding: 7px 10px; border-radius: 999px; background: var(--surface-strong); color: var(--accent-deep); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+        .archive-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+        .inspect-link { width: fit-content; min-height: 38px; padding: 0 14px; font-size: 0.92rem; }
         .sidebar-card { padding: 22px; }
         .meta-list, .timeline, .download-list { display: grid; gap: 14px; margin-top: 18px; }
         .meta-item, .timeline-item, .download-item { display: grid; gap: 6px; padding: 14px 16px; border-radius: 18px; background: var(--surface-alt); border: 1px solid var(--line); }
@@ -140,7 +142,7 @@
             .section-header, .footer, .topbar { align-items: start; flex-direction: column; }
             .panel-actions, .download-actions, .top-actions { width: 100%; }
             .panel-actions > *, .download-actions > *, .top-actions > * { width: 100%; }
-            .app-link, .download-link, button { width: 100%; }
+            .app-link, .download-link, .inspect-link, button { width: 100%; }
             .archive-grid { grid-template-columns: 1fr; }
         }
     </style>
@@ -216,6 +218,9 @@
                             <span class="archive-badge">{{ run.label }}</span>
                             <strong>{{ run.name }}</strong>
                             <span>{{ run.file_count }} GRIB file{% if run.file_count != 1 %}s{% endif %} archived</span>
+                            <div class="archive-actions">
+                                <a class="inspect-link" href="/grib-dataset?date={{ selected_date }}&run={{ run.name }}">Inspect Dataset</a>
+                            </div>
                         </article>
                         {% endfor %}
                     </div>
