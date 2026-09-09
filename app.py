@@ -349,11 +349,14 @@ def view_grib_dataset() -> str:
 @app.route("/run-task1")
 def run_task1():
     task_run_id = build_task_run_id()
-    selected_product, product = get_product_config(request.args.get("product"))
     scripts = [
         resolve_script_path(
-            product["render_script"],
-            product["script"],
+            "/opt/render/project/src/hrrr_grib_2m_sfc_archive.py",
+            "hrrr_grib_2m_sfc_archive.py",
+        ),
+        resolve_script_path(
+            "/opt/render/project/src/hrrr_grib_total_precip_sfc_archive.py",
+            "hrrr_grib_total_precip_sfc_archive.py",
         ),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
