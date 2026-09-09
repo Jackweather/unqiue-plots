@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GRIB Dataset Summary</title>
+    <style>
+        :root {
+            --page: #f4f7fb;
+            --surface: #ffffff;
+            --surface-alt: #f8fafc;
+            --ink: #142033;
+            --muted: #607087;
+            --line: #d8e0ea;
+            --accent: #1f5eff;
+            --accent-deep: #173ea6;
+            --danger: #b42318;
+            --shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+            --radius: 22px;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", "Aptos", "Helvetica Neue", sans-serif;
+            background: linear-gradient(180deg, #eef4fb 0%, var(--page) 100%);
+            color: var(--ink);
+        }
+        .page { width: min(1180px, calc(100% - 24px)); margin: 0 auto; padding: 24px 0 40px; }
+        .topbar, .panel-head, .group-head { display: flex; justify-content: space-between; gap: 16px; align-items: center; flex-wrap: wrap; }
+        .topbar { margin-bottom: 22px; }
+        .back-link {
+            display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px;
+            border-radius: 14px; background: #fff; border: 1px solid var(--line); text-decoration: none; box-shadow: var(--shadow); font-weight: 600;
+        }
+        .hero, .panel, .empty {
+            background: rgba(255, 255, 255, 0.94); border: 1px solid var(--line); border-radius: 26px; box-shadow: var(--shadow);
+        }
+        .hero { padding: 28px; margin-bottom: 22px; }
+        .hero h1, .panel h2, .group h3 { margin: 0; letter-spacing: -0.03em; }
+        .hero h1 { font-size: clamp(2rem, 4vw, 3.2rem); }
+        .hero p, .meta, .group p, .error { margin: 0; color: var(--muted); line-height: 1.6; }
+        .hero-copy { display: grid; gap: 12px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 20px; }
+        .stat { padding: 16px 18px; border-radius: 18px; background: var(--surface-alt); border: 1px solid var(--line); }
+        .stat span { display: block; color: var(--muted); font-size: 0.84rem; }
+        .stat strong { display: block; margin-top: 8px; font-size: 1.2rem; }
+        .panel { padding: 24px; display: grid; gap: 22px; }
+        .group { display: grid; gap: 12px; }
+        .group + .group { padding-top: 20px; border-top: 1px solid var(--line); }
+        .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 18px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; }
+        th, td { padding: 12px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+        th { background: var(--surface-alt); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+        tr:last-child td { border-bottom: 0; }
+        .code-block {
+            margin: 0; padding: 16px; border-radius: 18px; background: #0f172a; color: #e2e8f0; overflow: auto; font: 0.9rem/1.5 "Cascadia Code", Consolas, monospace;
+        }
+        .error { color: var(--danger); }
+        .empty { padding: 30px; text-align: center; }
+        @media (max-width: 720px) {
+            .page { width: min(1180px, calc(100% - 16px)); padding-top: 16px; }
+            .hero, .panel, .empty { border-radius: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <div class="topbar">
+            <div>
+                <p class="meta">Dataset Inspector</p>
+                <h1 style="margin: 4px 0 0; font-size: 1.5rem;">GRIB Dataset Summary</h1>
+            </div>
+            <a class="back-link" href="/?date={{ selected_date }}">Back to Archive</a>
+        </div>
+
+        <section class="hero">
+            <div class="hero-copy">
+                <h1>{{ run_name|upper }} dataset preview</h1>
+                <p>Showing a quick summary from the first GRIB file in this run folder so you can inspect what fields and dimensions are inside the dataset.</p>
+            </div>
+            <div class="stats">
+                <div class="stat"><span>Date</span><strong>{{ selected_date }}</strong></div>
+                <div class="stat"><span>Run</span><strong>{{ run_name }}</strong></div>
+                <div class="stat"><span>Files in run</span><strong>{{ file_count }}</strong></div>
+                <div class="stat"><span>Preview file</span><strong>{{ selected_file }}</strong></div>
+            </div>
+        </section>
+
+        {% if load_error %}
+        <section class="empty">
+            <h2>Unable to read dataset</h2>
+            <p class="error">{{ load_error }}</p>
+        </section>
+        {% elif summary %}
+        <section class="panel">
+            <div class="group">
+                <div class="group-head">
+                    <h2>Dimensions</h2>
+                    <p>{{ summary.dimensions|length }} total</p>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Name</th><th>Size</th></tr></thead>
+                        <tbody>
+                            {% for item in summary.dimensions %}
+                            <tr><td>{{ item.name }}</td><td>{{ item.size }}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-head">
+                    <h2>Coordinates</h2>
+                    <p>{{ summary.coordinates|length }} total</p>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Name</th><th>Dims</th><th>Dtype</th></tr></thead>
+                        <tbody>
+                            {% for item in summary.coordinates %}
+                            <tr><td>{{ item.name }}</td><td>{{ item.dims|join(', ') }}</td><td>{{ item.dtype }}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-head">
+                    <h2>Data Variables</h2>
+                    <p>{{ summary.variables|length }} total</p>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Name</th><th>Dims</th><th>Shape</th><th>Dtype</th><th>Attrs</th></tr></thead>
+                        <tbody>
+                            {% for item in summary.variables %}
+                            <tr>
+                                <td>{{ item.name }}</td>
+                                <td>{{ item.dims|join(', ') }}</td>
+                                <td>{{ item.shape|join(' x ') }}</td>
+                                <td>{{ item.dtype }}</td>
+                                <td><pre class="code-block">{{ item.attrs }}</pre></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-head">
+                    <h2>Dataset Attributes</h2>
+                </div>
+                <pre class="code-block">{{ summary.attributes }}</pre>
+            </div>
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>
