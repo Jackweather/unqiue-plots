@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>HRRR Plot Viewer</title>
+    <title>HRRR GRIB Archive</title>
     <style>
         :root {
             --page: #f4f7fb;
@@ -154,13 +154,12 @@
                 <div class="brand-mark">H</div>
                 <div class="brand-copy">
                     <p class="eyebrow">Operations Dashboard</p>
-                    <p class="brand-title">HRRR Temperature Plot Viewer</p>
+                    <p class="brand-title">HRRR GRIB Archive</p>
                 </div>
             </div>
             <nav class="top-actions" aria-label="Primary navigation">
-                <a class="app-link" href="/products-maps">Product Maps</a>
                 {% if selected_date and raw_grib_available %}
-                <a class="download-link" href="/downloads/raw-grib.zip?date={{ selected_date }}">Download Selected Date</a>
+                <a class="download-link" href="/downloads/raw-grib.zip?product={{ selected_product }}&date={{ selected_date }}">Download Selected Date</a>
                 {% endif %}
             </nav>
         </header>
@@ -169,9 +168,9 @@
                 <div class="hero-copy">
                     <div>
                         <p class="eyebrow">Forecast Archive</p>
-                        <h1>View HRRR temperature plots by date and state.</h1>
+                        <h1>View archived HRRR {{ selected_product_label|lower }} GRIB files.</h1>
                     </div>
-                    <p>Browse archived GRIB files by date, review available runs, and download one date or the full archive from the same page.</p>
+                    <p>Switch between temperature and total precipitation, review archived runs by date, and inspect dataset contents from the same workflow.</p>
                     <div class="hero-stats">
                         <div class="stat"><span>Available dates</span><strong>{{ available_dates|length }}</strong></div>
                         <div class="stat"><span>Archived runs</span><strong>{{ run_entries|length }}</strong></div>
@@ -181,9 +180,17 @@
                 <aside class="hero-panel">
                     <div class="panel-heading">
                         <h2>Explore Archive</h2>
-                        <p>Choose a run date to inspect the archived GRIB collection for that day.</p>
+                        <p>Choose a product and date to inspect the archived GRIB collection for that day.</p>
                     </div>
                     <form class="filters" method="get">
+                        <div class="field">
+                            <label for="product">Dataset</label>
+                            <select id="product" name="product">
+                                {% for product in product_options %}
+                                <option value="{{ product.key }}" {% if product.key == selected_product %}selected{% endif %}>{{ product.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                         <div class="field">
                             <label for="date">Run date</label>
                             <select id="date" name="date">
@@ -195,7 +202,7 @@
                         <div class="panel-actions"><button type="submit">Open Archive</button></div>
                     </form>
                     {% if selected_date %}
-                    <div class="panel-note"><strong>Current date</strong><span>Viewing archived GRIB files for {{ selected_date }}.</span></div>
+                    <div class="panel-note"><strong>Current view</strong><span>Viewing {{ selected_product_label|lower }} GRIB files for {{ selected_date }}.</span></div>
                     {% endif %}
                 </aside>
             </div>
@@ -207,8 +214,8 @@
                     <div class="section-header">
                         <div>
                             <span class="section-kicker">Archive runs</span>
-                            <h2>GRIB archive for {{ selected_date }}</h2>
-                            <p>Each run folder contains the downloaded temperature GRIB files for that cycle.</p>
+                            <h2>{{ selected_product_label }} archive for {{ selected_date }}</h2>
+                            <p>Each run folder contains the downloaded {{ selected_product_label|lower }} GRIB files for that cycle.</p>
                         </div>
                         <div class="meta-copy">{{ run_entries|length }} run{% if run_entries|length != 1 %}s{% endif %} available</div>
                     </div>
@@ -217,9 +224,9 @@
                         <article class="archive-card">
                             <span class="archive-badge">{{ run.label }}</span>
                             <strong>{{ run.name }}</strong>
-                            <span>{{ run.file_count }} GRIB file{% if run.file_count != 1 %}s{% endif %} archived</span>
+                            <span>{{ run.file_count }} {{ selected_product_label }} file{% if run.file_count != 1 %}s{% endif %} archived</span>
                             <div class="archive-actions">
-                                <a class="inspect-link" href="/grib-dataset?date={{ selected_date }}&run={{ run.name }}">Inspect Dataset</a>
+                                <a class="inspect-link" href="/grib-dataset?product={{ selected_product }}&date={{ selected_date }}&run={{ run.name }}">Inspect Dataset</a>
                             </div>
                         </article>
                         {% endfor %}
@@ -229,7 +236,7 @@
                 <section class="empty">
                     <div class="empty-icon">!</div>
                     <h2>No GRIB archive available yet</h2>
-                    <p>{% if selected_date %}No raw GRIB files were found for {{ selected_date }}.{% else %}No dated output folders were found yet. Run the HRRR downloader first so it writes into /var/data/output.{% endif %}</p>
+                    <p>{% if selected_date %}No {{ selected_product_label|lower }} GRIB files were found for {{ selected_date }}.{% else %}No dated output folders were found yet. Run the HRRR downloader first so it writes into /var/data/output.{% endif %}</p>
                 </section>
                 {% endif %}
                 {% if downloadable_dates %}
@@ -237,12 +244,13 @@
                     <div class="section-header">
                         <div>
                             <span class="section-kicker">Raw model files</span>
-                            <h2>Download archived GRIB files</h2>
-                            <p>Select one or more dates to generate a zip from the saved raw temperature files.</p>
+                            <h2>Download archived {{ selected_product_label|lower }} files</h2>
+                            <p>Select one or more dates to generate a zip from the saved raw {{ selected_product_label|lower }} files.</p>
                         </div>
                         <div class="meta-copy">{{ downloadable_dates|length }} archived date{% if downloadable_dates|length != 1 %}s{% endif %}</div>
                     </div>
                     <form class="download-form" method="get" action="/downloads/raw-grib.zip">
+                        <input type="hidden" name="product" value="{{ selected_product }}">
                         <div class="download-options">
                             {% for date in downloadable_dates %}
                             <label class="download-option" for="download-date-{{ date }}"><span>{{ date }}</span><input id="download-date-{{ date }}" type="checkbox" name="date" value="{{ date }}" {% if date in selected_download_dates %}checked{% endif %}></label>
@@ -250,7 +258,7 @@
                         </div>
                         <div class="download-actions">
                             <button type="submit">Download Checked Dates</button>
-                            <a class="download-link" href="/downloads/raw-grib.zip?all=1">Download All Dates</a>
+                            <a class="download-link" href="/downloads/raw-grib.zip?product={{ selected_product }}&all=1">Download All Dates</a>
                         </div>
                     </form>
                 </section>
@@ -259,8 +267,9 @@
             <aside class="sidebar">
                 <section class="sidebar-card">
                     <h2>Archive Snapshot</h2>
-                    <p>Quick context for the current raw GRIB archive.</p>
+                    <p>Quick context for the current {{ selected_product_label|lower }} archive.</p>
                     <div class="meta-list">
+                        <div class="meta-item"><span class="meta-label">Dataset</span><strong class="meta-value">{{ selected_product_label }}</strong></div>
                         <div class="meta-item"><span class="meta-label">Primary date</span><strong class="meta-value">{{ selected_date or 'No selection' }}</strong></div>
                         <div class="meta-item"><span class="meta-label">Archived runs</span><strong class="meta-value">{{ run_entries|length }}</strong></div>
                         <div class="meta-item"><span class="meta-label">Downloadable archive</span><strong class="meta-value">{% if raw_grib_available %}Ready{% else %}Unavailable{% endif %}</strong></div>
@@ -279,10 +288,10 @@
                 {% endif %}
                 <section class="sidebar-card">
                     <h2>Downloader Workflow</h2>
-                    <p>The main workflow now focuses on archiving and downloading raw temperature GRIB files.</p>
+                    <p>The main workflow now supports both temperature and total precipitation with the same archive and dataset inspector.</p>
                     <div class="download-list">
-                        <div class="download-item"><strong>Background task</strong><span>The app now starts one GRIB downloader script instead of multiple plot builders.</span></div>
-                        <div class="download-item"><strong>Archive handling</strong><span>ZIP downloads still use the same backend packaging endpoint.</span></div>
+                        <div class="download-item"><strong>Temperature</strong><span>Archived under the 2 m temperature GRIB workflow.</span></div>
+                        <div class="download-item"><strong>Total precip</strong><span>Archived separately with the same run and dataset inspection flow.</span></div>
                     </div>
                 </section>
             </aside>
