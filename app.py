@@ -152,11 +152,17 @@ def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
             dataset_attrs["source"] = Path(source_value).name
         history_value = dataset_attrs.get("history")
         if history_value:
-            dataset_attrs["history"] = re.sub(
+            sanitized_history = re.sub(
                 r'("source"\s*:\s*")([^"]+)(")',
                 lambda match: f'{match.group(1)}{Path(match.group(2)).name}{match.group(3)}',
                 history_value,
             )
+            sanitized_history = re.sub(
+                r"\s*GRIB to CDM\+CF via cfgrib-[^\s]+/ecCodes-[^\s]+ with\s*",
+                " ",
+                sanitized_history,
+            ).strip()
+            dataset_attrs["history"] = sanitized_history
 
         return {
             "dimensions": [{"name": name, "size": size} for name, size in ds.sizes.items()],
