@@ -241,8 +241,8 @@ def run_task1():
     task_run_id = build_task_run_id()
     scripts = [
         resolve_script_path(
-            "/opt/render/project/src/hrrr_grib_archive.py",
-            "hrrr_grib_archive.py",
+            "/opt/render/project/src/hrrr_grib_2m_sfc_archive.py",
+            "hrrr_grib_2m_sfc_archive.py",
         ),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
