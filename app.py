@@ -52,6 +52,27 @@ PRODUCTS = {
         "script": "hrrr_grib_cape_sfc_archive.py",
         "render_script": "/opt/render/project/src/hrrr_grib_cape_sfc_archive.py",
     },
+    "surface_cfrzr": {
+        "label": "Surface Freezing Rain",
+        "short_label": "Freezing Rain",
+        "archive_dir": "raw_grib_cfrzr",
+        "script": "hrrr_grib_cfrzr_sfc_archive.py",
+        "render_script": "/opt/render/project/src/hrrr_grib_cfrzr_sfc_archive.py",
+    },
+    "surface_cicep": {
+        "label": "Surface Ice Pellets",
+        "short_label": "Ice Pellets",
+        "archive_dir": "raw_grib_cicep",
+        "script": "hrrr_grib_cicep_sfc_archive.py",
+        "render_script": "/opt/render/project/src/hrrr_grib_cicep_sfc_archive.py",
+    },
+    "surface_csnow": {
+        "label": "Surface Snow",
+        "short_label": "Snow",
+        "archive_dir": "raw_grib_csnow",
+        "script": "hrrr_grib_csnow_sfc_archive.py",
+        "render_script": "/opt/render/project/src/hrrr_grib_csnow_sfc_archive.py",
+    },
 }
 DEFAULT_PRODUCT_KEY = "temp_2m"
 
@@ -379,6 +400,18 @@ def run_task1():
         resolve_script_path(
             "/opt/render/project/src/hrrr_grib_cape_sfc_archive.py",
             "hrrr_grib_cape_sfc_archive.py",
+        ),
+        resolve_script_path(
+            "/opt/render/project/src/hrrr_grib_cfrzr_sfc_archive.py",
+            "hrrr_grib_cfrzr_sfc_archive.py",
+        ),
+        resolve_script_path(
+            "/opt/render/project/src/hrrr_grib_cicep_sfc_archive.py",
+            "hrrr_grib_cicep_sfc_archive.py",
+        ),
+        resolve_script_path(
+            "/opt/render/project/src/hrrr_grib_csnow_sfc_archive.py",
+            "hrrr_grib_csnow_sfc_archive.py",
         ),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
