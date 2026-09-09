@@ -38,6 +38,13 @@ PRODUCTS = {
         "script": "hrrr_grib_total_precip_sfc_archive.py",
         "render_script": "/opt/render/project/src/hrrr_grib_total_precip_sfc_archive.py",
     },
+    "surface_gust": {
+        "label": "Surface Wind Gust",
+        "short_label": "Wind Gust",
+        "archive_dir": "raw_grib_gust",
+        "script": "hrrr_grib_gust_sfc_archive.py",
+        "render_script": "/opt/render/project/src/hrrr_grib_gust_sfc_archive.py",
+    },
 }
 DEFAULT_PRODUCT_KEY = "temp_2m"
 
@@ -357,6 +364,10 @@ def run_task1():
         resolve_script_path(
             "/opt/render/project/src/hrrr_grib_total_precip_sfc_archive.py",
             "hrrr_grib_total_precip_sfc_archive.py",
+        ),
+        resolve_script_path(
+            "/opt/render/project/src/hrrr_grib_gust_sfc_archive.py",
+            "hrrr_grib_gust_sfc_archive.py",
         ),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
