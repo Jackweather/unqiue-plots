@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory
+import xarray as xr
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -135,6 +136,35 @@ def list_raw_grib_runs(date_str: str) -> list[dict[str, str | int]]:
     return runs
 
 
+def get_run_files(date_str: str, run_name: str) -> list[Path]:
+    run_dir = get_raw_grib_dir(date_str) / run_name
+    if not run_dir.exists() or not run_dir.is_dir():
+        return []
+    return sorted(run_dir.glob("*.grib2"))
+
+
+def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
+    with xr.open_dataset(grib_path, engine="cfgrib", backend_kwargs={"indexpath": ""}) as ds:
+        return {
+            "dimensions": [{"name": name, "size": size} for name, size in ds.sizes.items()],
+            "coordinates": [
+                {"name": name, "dims": list(coord.dims), "dtype": str(coord.dtype)}
+                for name, coord in ds.coords.items()
+            ],
+            "variables": [
+                {
+                    "name": name,
+                    "dims": list(variable.dims),
+                    "shape": list(variable.shape),
+                    "dtype": str(variable.dtype),
+                    "attrs": {key: str(value) for key, value in list(variable.attrs.items())[:8]},
+                }
+                for name, variable in ds.data_vars.items()
+            ],
+            "attributes": {key: str(value) for key, value in ds.attrs.items()},
+        }
+
+
 def get_raw_grib_dir(date_str: str) -> Path:
     return OUTPUT_DIR / date_str / "raw_grib"
 
@@ -232,6 +262,33 @@ def download_raw_grib_archive():
         mimetype="application/zip",
         as_attachment=True,
         download_name=download_name,
+    )
+
+
+@app.route("/grib-dataset")
+def view_grib_dataset() -> str:
+    date_str = request.args.get("date", "")
+    run_name = request.args.get("run", "")
+    run_files = get_run_files(date_str, run_name)
+    if not run_files:
+        abort(404)
+
+    selected_file = run_files[0]
+    summary: dict[str, object] | None = None
+    load_error: str | None = None
+    try:
+        summary = summarize_grib_dataset(selected_file)
+    except Exception as exc:
+        load_error = str(exc)
+
+    return render_template(
+        "grib_dataset.html",
+        selected_date=date_str,
+        run_name=run_name,
+        selected_file=selected_file.name,
+        file_count=len(run_files),
+        summary=summary,
+        load_error=load_error,
     )
 
 
