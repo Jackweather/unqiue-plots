@@ -170,7 +170,7 @@
                         <p class="eyebrow">Forecast Archive</p>
                         <h1>View archived HRRR {{ selected_product_label|lower }} GRIB files.</h1>
                     </div>
-                    <p>Switch between archived HRRR datasets, review runs by date, and inspect dataset contents from the same workflow.</p>
+                    <p>Review archived HRRR 2 m temperature runs by date and inspect dataset contents from the same workflow.</p>
                     <div class="hero-stats">
                         <div class="stat"><span>Available dates</span><strong>{{ available_dates|length }}</strong></div>
                         <div class="stat"><span>Archived runs</span><strong>{{ run_entries|length }}</strong></div>
@@ -180,17 +180,9 @@
                 <aside class="hero-panel">
                     <div class="panel-heading">
                         <h2>Explore Archive</h2>
-                        <p>Choose a product and date to inspect the archived GRIB collection for that day.</p>
+                        <p>Choose a date to inspect the archived 2 m temperature GRIB collection for that day.</p>
                     </div>
                     <form class="filters" method="get">
-                        <div class="field">
-                            <label for="product">Dataset</label>
-                            <select id="product" name="product">
-                                {% for product in product_options %}
-                                <option value="{{ product.key }}" {% if product.key == selected_product %}selected{% endif %}>{{ product.label }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
                         <div class="field">
                             <label for="date">Run date</label>
                             <select id="date" name="date">
@@ -269,7 +261,7 @@
                         <div>
                             <span class="section-kicker">Legacy datasets</span>
                             <h2>Older archived dataset views</h2>
-                            <p>These archived products are still available to inspect even though the downloader now only keeps the combined surface workflow.</p>
+                            <p>These archived products are still available to inspect even though the active downloader now keeps only the 2 m temperature workflow.</p>
                         </div>
                         <div class="meta-copy">{{ legacy_products|length }} dataset{% if legacy_products|length != 1 %}s{% endif %}</div>
                     </div>
@@ -312,11 +304,11 @@
                 {% endif %}
                 <section class="sidebar-card">
                     <h2>Downloader Workflow</h2>
-                    <p>Task 1 now downloads both the combined surface dataset and the entire-atmosphere severe-weather dataset, while older archived groups remain available below.</p>
+                    <p>Task 1 is temporarily limited to 2 m temperature downloads while the broader surface and entire-atmosphere datasets are paused.</p>
                     <div class="download-list">
-                        <div class="download-item"><strong>Combined surface</strong><span>Current downloader and archive target for tracked surface fields.</span></div>
-                        <div class="download-item"><strong>Entire atmosphere</strong><span>Task 1 also archives hail, lightning, reflectivity, cloud cover, condensate, VIL, and related severe-weather fields.</span></div>
-                        <div class="download-item"><strong>Legacy datasets</strong><span>Older archive folders remain inspectable from the homepage.</span></div>
+                        <div class="download-item"><strong>2 m temperature</strong><span>Current downloader and archive target for the active workflow.</span></div>
+                        <div class="download-item"><strong>Paused datasets</strong><span>Entire atmosphere and expanded surface-field downloads are temporarily disabled.</span></div>
+                        <div class="download-item"><strong>Legacy datasets</strong><span>Older archive folders remain on disk, but the main workflow now highlights temperature only.</span></div>
                     </div>
                 </section>
             </aside>
