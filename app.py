@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 import contextlib
 import gzip
+import lzma
 from io import BytesIO
 from pathlib import Path
 import re
@@ -242,7 +243,7 @@ def get_run_files(date_str: str, run_name: str, product_key: str) -> list[Path]:
 
 
 def list_grib_files(path: Path) -> list[Path]:
-    return sorted([*path.glob("*.grib2"), *path.glob("*.grib2.gz")])
+    return sorted([*path.glob("*.grib2"), *path.glob("*.grib2.gz"), *path.glob("*.grib2.xz")])
 
 
 def open_grib_datasets_from_path(dataset_path: Path) -> list[tuple[xr.Dataset, dict[str, object]]]:
@@ -266,11 +267,12 @@ def open_grib_datasets_from_path(dataset_path: Path) -> list[tuple[xr.Dataset, d
 
 
 def open_grib_datasets(grib_path: Path):
-    if grib_path.suffix != ".gz":
+    if grib_path.suffix not in {".gz", ".xz"}:
         datasets = open_grib_datasets_from_path(grib_path)
         return datasets, None
 
-    with gzip.open(grib_path, "rb") as compressed_stream:
+    open_compressed = gzip.open if grib_path.suffix == ".gz" else lzma.open
+    with open_compressed(grib_path, "rb") as compressed_stream:
         with tempfile.NamedTemporaryFile(suffix=".grib2", delete=False) as temp_file:
             temp_file.write(compressed_stream.read())
             temp_path = Path(temp_file.name)
@@ -531,7 +533,7 @@ def create_raw_grib_archive(date_strs: list[str], product_key: str) -> BytesIO:
             if not raw_dir.exists():
                 continue
 
-            for grib_path in sorted([*raw_dir.rglob("*.grib2"), *raw_dir.rglob("*.grib2.gz")]):
+            for grib_path in sorted([*raw_dir.rglob("*.grib2"), *raw_dir.rglob("*.grib2.gz"), *raw_dir.rglob("*.grib2.xz")]):
                 archive_path = Path(date_str) / grib_path.relative_to(raw_dir)
                 archive.write(grib_path, arcname=str(archive_path))
 
