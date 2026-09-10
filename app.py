@@ -15,6 +15,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory
 import cfgrib
+import eccodes
 import xarray as xr
 
 
@@ -286,6 +287,50 @@ def normalize_field_token(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", value.lower())
 
 
+def safe_grib_get(handle, key: str) -> str:
+    try:
+        return str(eccodes.codes_get(handle, key))
+    except Exception:
+        return ""
+
+
+def get_grib_message_match_label(message: dict[str, str], dataset_label: str) -> str:
+    preferred_name = message.get("shortName") or message.get("name") or "unknown"
+    type_of_level = message.get("typeOfLevel", "").strip()
+    level = message.get("level", "").strip()
+    level_suffix = ""
+    if type_of_level and level:
+        level_suffix = f", {type_of_level} {level}"
+    elif type_of_level:
+        level_suffix = f", {type_of_level}"
+    return f"{preferred_name} ({dataset_label}{level_suffix})"
+
+
+def extract_grib_message_inventory(grib_path: Path) -> list[dict[str, str]]:
+    messages: list[dict[str, str]] = []
+    with grib_path.open("rb") as stream:
+        while True:
+            handle = eccodes.codes_grib_new_from_file(stream)
+            if handle is None:
+                break
+            try:
+                messages.append(
+                    {
+                        "shortName": safe_grib_get(handle, "shortName"),
+                        "name": safe_grib_get(handle, "name"),
+                        "typeOfLevel": safe_grib_get(handle, "typeOfLevel"),
+                        "level": safe_grib_get(handle, "level"),
+                        "stepType": safe_grib_get(handle, "stepType"),
+                        "paramId": safe_grib_get(handle, "paramId"),
+                        "parameterCategory": safe_grib_get(handle, "parameterCategory"),
+                        "parameterNumber": safe_grib_get(handle, "parameterNumber"),
+                    }
+                )
+            finally:
+                eccodes.codes_release(handle)
+    return messages
+
+
 def get_variable_match_label(name: str, variable: xr.DataArray, dataset_label: str) -> str:
     preferred_name = str(variable.attrs.get("GRIB_shortName") or variable.attrs.get("short_name") or name)
     type_of_level = str(variable.attrs.get("GRIB_typeOfLevel") or "").strip()
@@ -305,9 +350,10 @@ def get_tracked_fields_for_product(product_key: str) -> list[dict[str, object]]:
 
 
 def build_tracked_field_summary(
-    datasets: list[tuple[xr.Dataset, dict[str, object]]], product_key: str
+    datasets: list[tuple[xr.Dataset, dict[str, object]]], product_key: str, grib_messages: list[dict[str, str]]
 ) -> list[dict[str, object]]:
     variable_lookup: dict[str, set[str]] = {}
+    message_lookup: dict[str, set[str]] = {}
     for dataset_index, (ds, backend_kwargs) in enumerate(datasets, start=1):
         dataset_label = backend_kwargs.get("filter_by_keys", {}).get("stepType", f"dataset-{dataset_index}")
         for name, variable in ds.data_vars.items():
@@ -326,10 +372,28 @@ def build_tracked_field_summary(
             for token in [token for token in tokens if token]:
                 variable_lookup.setdefault(token, set()).add(display_name)
 
+    for message_index, message in enumerate(grib_messages, start=1):
+        dataset_label = f"message-{message_index}"
+        display_name = get_grib_message_match_label(message, dataset_label)
+        tokens = {
+            normalize_field_token(message.get("shortName", "")),
+            normalize_field_token(message.get("name", "")),
+            normalize_field_token(f"param{message.get('parameterCategory', '')}_{message.get('parameterNumber', '')}"),
+            normalize_field_token(f"paramid{message.get('paramId', '')}"),
+        }
+        for token in [token for token in tokens if token]:
+            message_lookup.setdefault(token, set()).add(display_name)
+
     summary_rows: list[dict[str, object]] = []
     for field in get_tracked_fields_for_product(product_key):
         aliases = field.get("aliases", set())
-        matched_names = sorted({name for alias in aliases for name in variable_lookup.get(alias, set())})
+        matched_names = sorted(
+            {
+                name
+                for alias in aliases
+                for name in [*variable_lookup.get(alias, set()), *message_lookup.get(alias, set())]
+            }
+        )
         if field.get("request_only"):
             status = "request-filter"
         elif matched_names:
@@ -354,6 +418,8 @@ def build_tracked_field_summary(
 def summarize_grib_dataset(grib_path: Path, product_key: str) -> dict[str, object]:
     opened_datasets, temp_path = open_grib_datasets(grib_path)
     try:
+        inventory_path = temp_path if temp_path is not None else grib_path
+        grib_messages = extract_grib_message_inventory(inventory_path)
         variable_entries: list[dict[str, object]] = []
         combined_dimensions: dict[str, int] = {}
         coordinates: list[dict[str, object]] = []
@@ -409,7 +475,7 @@ def summarize_grib_dataset(grib_path: Path, product_key: str) -> dict[str, objec
             )
 
         return {
-            "tracked_fields": build_tracked_field_summary(opened_datasets, product_key),
+            "tracked_fields": build_tracked_field_summary(opened_datasets, product_key, grib_messages),
             "dimensions": [{"name": name, "size": size} for name, size in combined_dimensions.items()],
             "coordinates": coordinates,
             "variables": variable_entries,
