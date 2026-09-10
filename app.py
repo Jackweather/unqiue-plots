@@ -4,10 +4,7 @@ from datetime import datetime
 import gzip
 from io import BytesIO
 from pathlib import Path
-import subprocess
 import re
-import sys
-import threading
 import tempfile
 from zoneinfo import ZoneInfo
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -26,156 +23,13 @@ EASTERN_TIMEZONE = ZoneInfo("America/New_York")
 app = Flask(__name__)
 
 PRODUCTS = {
-    "temp_2m": {
-        "label": "2 m Temperature",
-        "short_label": "Temperature",
-        "archive_dir": "raw_grib",
-        "script": "hrrr_grib_2m_sfc_archive.py",
-        "render_script": "/opt/render/project/src/hrrr_grib_2m_sfc_archive.py",
-    },
-    "total_precip": {
-        "label": "Total Precipitation",
-        "short_label": "Total Precip",
-        "archive_dir": "raw_grib_total_precip",
-        "script": "hrrr_grib_total_precip_sfc_archive.py",
-        "render_script": "/opt/render/project/src/hrrr_grib_total_precip_sfc_archive.py",
-    },
-    "surface_gust": {
-        "label": "Surface Wind Gust",
-        "short_label": "Wind Gust",
-        "archive_dir": "raw_grib_gust",
-        "script": "hrrr_grib_gust_sfc_archive.py",
-        "render_script": "/opt/render/project/src/hrrr_grib_gust_sfc_archive.py",
-    },
-    "surface_cape": {
-        "label": "Surface CAPE",
-        "short_label": "CAPE",
-        "archive_dir": "raw_grib_cape",
-        "script": "hrrr_grib_cape_sfc_archive.py",
-        "render_script": "/opt/render/project/src/hrrr_grib_cape_sfc_archive.py",
-    },
-    "surface_cfrzr": {
-        "label": "Surface Freezing Rain",
-        "short_label": "Freezing Rain",
-        "archive_dir": "raw_grib_cfrzr",
-        "script": "hrrr_grib_cfrzr_sfc_archive.py",
-        "render_script": "/opt/render/project/src/hrrr_grib_cfrzr_sfc_archive.py",
-    },
-    "surface_cicep": {
-        "label": "Surface Ice Pellets",
-        "short_label": "Ice Pellets",
-        "archive_dir": "raw_grib_cicep",
-        "script": "hrrr_grib_cicep_sfc_archive.py",
-        "render_script": "/opt/render/project/src/hrrr_grib_cicep_sfc_archive.py",
-    },
-    "surface_csnow": {
-        "label": "Surface Snow",
-        "short_label": "Snow",
-        "archive_dir": "raw_grib_csnow",
-        "script": "hrrr_grib_csnow_sfc_archive.py",
-        "render_script": "/opt/render/project/src/hrrr_grib_csnow_sfc_archive.py",
-    },
-    "surface_hpbl_prate_snod_vis_weasd": {
-        "label": "Surface HPBL PRATE SNOD VIS WEASD",
-        "short_label": "HPBL + PRATE + SNOD + VIS + WEASD",
-        "archive_dir": "raw_grib_hpbl_prate_snod_vis_weasd",
-        "script": "hrrr_grib_hpbl_prate_snod_vis_weasd_sfc_archive.py",
-        "render_script": "/opt/render/project/src/hrrr_grib_hpbl_prate_snod_vis_weasd_sfc_archive.py",
-    },
     "surface_full": {
         "label": "Combined Surface Dataset",
         "short_label": "Full Surface",
         "archive_dir": "raw_grib_full_surface",
-        "script": "hrrr_grib_full_surface_archive.py",
-        "render_script": "/opt/render/project/src/hrrr_grib_full_surface_archive.py",
     },
 }
-DEFAULT_PRODUCT_KEY = "temp_2m"
-
-
-def resolve_script_path(render_script: str, local_script: str) -> tuple[str, str]:
-    render_path = Path(render_script)
-    if render_path.exists():
-        return str(render_path), str(render_path.parent)
-
-    local_path = BASE_DIR / local_script
-    return str(local_path), str(local_path.parent)
-
-
-def get_summary_log_dir() -> Path:
-    if RENDER_BASE_DIR.exists():
-        return RENDER_BASE_DIR
-    return BASE_DIR
-
-
-def build_task_run_id(now: datetime | None = None) -> str:
-    eastern_now = (now or datetime.now(EASTERN_TIMEZONE)).astimezone(EASTERN_TIMEZONE)
-    return eastern_now.strftime("task1_%y%m%d_%I_%M_%S%p").lower()
-
-
-def format_duration(duration_seconds: float) -> str:
-    total_seconds = int(round(duration_seconds))
-    minutes, seconds = divmod(total_seconds, 60)
-    hours, minutes = divmod(minutes, 60)
-    return f"{hours}h {minutes}m {seconds}s"
-
-
-def run_scripts(scripts: list[tuple[str, str]], task_run_id: str, max_parallel: int = 1) -> None:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    semaphore = threading.Semaphore(max_parallel)
-    threads: list[threading.Thread] = []
-    result_lock = threading.Lock()
-    run_results: list[tuple[str, float]] = []
-    summary_log_path = get_summary_log_dir() / f"{task_run_id}.log"
-    log_lock = threading.Lock()
-
-    def run_one(script_path: str, working_dir: str) -> None:
-        with semaphore:
-            started_at = datetime.now()
-            with summary_log_path.open("a", encoding="utf-8") as log_file:
-                with log_lock:
-                    log_file.write(f"Task run id: {task_run_id}\n")
-                    log_file.write(f"Starting {Path(script_path).name}: {started_at.isoformat()}\n")
-                    log_file.flush()
-                process = subprocess.Popen(
-                    ["python", script_path],
-                    cwd=working_dir,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    stdout=subprocess.PIPE,
-                )
-                assert process.stdout is not None
-                for line in process.stdout:
-                    sys.stdout.write(line)
-                    sys.stdout.flush()
-                    with log_lock:
-                        log_file.write(line)
-                        log_file.flush()
-
-                process.wait()
-                finished_at = datetime.now()
-                duration_seconds = (finished_at - started_at).total_seconds()
-                with log_lock:
-                    log_file.write(f"Finished {Path(script_path).name}: {finished_at.isoformat()}\n")
-                    log_file.write(f"Duration {Path(script_path).name}: {format_duration(duration_seconds)}\n")
-                    log_file.write(f"Exit code {Path(script_path).name}: {process.returncode}\n\n")
-                    log_file.flush()
-                with result_lock:
-                    run_results.append((Path(script_path).name, duration_seconds))
-                print(f"[{Path(script_path).name}] Exit code: {process.returncode}", flush=True)
-
-    for script_path, working_dir in scripts:
-        worker = threading.Thread(target=run_one, args=(script_path, working_dir), daemon=True)
-        worker.start()
-        threads.append(worker)
-
-    for worker in threads:
-        worker.join()
-
-    with summary_log_path.open("a", encoding="utf-8") as summary_log:
-        summary_log.write("Script durations:\n")
-        for script_name, duration_seconds in run_results:
-            summary_log.write(f"{script_name}: {format_duration(duration_seconds)}\n")
+DEFAULT_PRODUCT_KEY = "surface_full"
 
 
 def get_date_directories() -> list[Path]:
@@ -444,55 +298,6 @@ def view_grib_dataset() -> str:
         summary=summary,
         load_error=load_error,
     )
-
-
-
-@app.route("/run-task1")
-def run_task1():
-    task_run_id = build_task_run_id()
-    scripts = [
-        resolve_script_path(
-            "/opt/render/project/src/hrrr_grib_2m_sfc_archive.py",
-            "hrrr_grib_2m_sfc_archive.py",
-        ),
-        resolve_script_path(
-            "/opt/render/project/src/hrrr_grib_total_precip_sfc_archive.py",
-            "hrrr_grib_total_precip_sfc_archive.py",
-        ),
-        resolve_script_path(
-            "/opt/render/project/src/hrrr_grib_gust_sfc_archive.py",
-            "hrrr_grib_gust_sfc_archive.py",
-        ),
-        resolve_script_path(
-            "/opt/render/project/src/hrrr_grib_cape_sfc_archive.py",
-            "hrrr_grib_cape_sfc_archive.py",
-        ),
-        resolve_script_path(
-            "/opt/render/project/src/hrrr_grib_cfrzr_sfc_archive.py",
-            "hrrr_grib_cfrzr_sfc_archive.py",
-        ),
-        resolve_script_path(
-            "/opt/render/project/src/hrrr_grib_cicep_sfc_archive.py",
-            "hrrr_grib_cicep_sfc_archive.py",
-        ),
-        resolve_script_path(
-            "/opt/render/project/src/hrrr_grib_csnow_sfc_archive.py",
-            "hrrr_grib_csnow_sfc_archive.py",
-        ),
-        resolve_script_path(
-            "/opt/render/project/src/hrrr_grib_hpbl_prate_snod_vis_weasd_sfc_archive.py",
-            "hrrr_grib_hpbl_prate_snod_vis_weasd_sfc_archive.py",
-        ),
-        resolve_script_path(
-            "/opt/render/project/src/hrrr_grib_full_surface_archive.py",
-            "hrrr_grib_full_surface_archive.py",
-        ),
-    ]
-    threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
-    return f"Task started in background as {task_run_id}.", 200
-
-
-
 
 if __name__ == "__main__":
     app.run(debug=True)
