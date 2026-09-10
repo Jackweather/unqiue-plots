@@ -89,7 +89,7 @@ def format_duration_hhmmss(started_at: datetime, finished_at: datetime) -> str:
     total_seconds = max(0, int((finished_at - started_at).total_seconds()))
     hours, remainder = divmod(total_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    return f"{hours:02d}{minutes:02d}{seconds:02d}"
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 
 def resolve_script_path(render_path: str, local_name: str) -> Path:
@@ -125,7 +125,7 @@ def run_scripts(scripts: list[Path], task_run_id: str, task_number: int) -> None
 
         finished_at = datetime.now(EASTERN_TIMEZONE)
         log_file.write(f"Finished task{task_number} at {finished_at.isoformat()}\n")
-        log_file.write(f"Duration: {format_duration_hhmmss(started_at, finished_at)}\n")
+        log_file.write(f"Total run time: {format_duration_hhmmss(started_at, finished_at)}\n")
         log_file.flush()
 
 
