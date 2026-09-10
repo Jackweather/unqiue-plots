@@ -162,10 +162,10 @@
                 </div>
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>Name</th><th>Dims</th><th>Dtype</th></tr></thead>
+                        <thead><tr><th>Dataset Slice</th><th>Name</th><th>Dims</th><th>Dtype</th></tr></thead>
                         <tbody>
                             {% for item in summary.coordinates %}
-                            <tr><td>{{ item.name }}</td><td>{{ item.dims|join(', ') }}</td><td>{{ item.dtype }}</td></tr>
+                            <tr><td class="nowrap">{{ item.dataset }}</td><td>{{ item.name }}</td><td>{{ item.dims|join(', ') }}</td><td>{{ item.dtype }}</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -180,10 +180,11 @@
                 <div class="table-note">Attributes are trimmed to the first few metadata entries so the table stays readable.</div>
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>Name</th><th>Dims</th><th>Shape</th><th>Dtype</th><th>Attrs</th></tr></thead>
+                        <thead><tr><th>Dataset Slice</th><th>Name</th><th>Dims</th><th>Shape</th><th>Dtype</th><th>Attrs</th></tr></thead>
                         <tbody>
                             {% for item in summary.variables %}
                             <tr>
+                                <td class="nowrap">{{ item.dataset }}</td>
                                 <td class="nowrap">{{ item.name }}</td>
                                 <td class="nowrap">{{ item.dims|join(', ') }}</td>
                                 <td class="nowrap">{{ item.shape|join(' x ') }}</td>
@@ -200,7 +201,19 @@
                 <div class="group-head">
                     <h2>Dataset Attributes</h2>
                 </div>
-                <pre class="code-block">{{ summary.attributes }}</pre>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Dataset Slice</th><th>Attributes</th></tr></thead>
+                        <tbody>
+                            {% for item in summary.attributes %}
+                            <tr>
+                                <td class="nowrap">{{ item.dataset }}</td>
+                                <td><pre class="code-block">{{ item.attrs }}</pre></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
         {% endif %}
