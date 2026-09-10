@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+import gzip
 from pathlib import Path
 
 import requests
@@ -46,6 +47,11 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_TIMEOUT,
         help="HTTP timeout in seconds for each request.",
     )
+    parser.add_argument(
+        "--no-compress",
+        action="store_true",
+        help="Store downloaded files as .grib2 instead of .grib2.gz.",
+    )
     return parser.parse_args()
 
 
@@ -84,12 +90,15 @@ def load_or_download_grib(
     forecast_hour: int,
     timeout: int,
     raw_dir: Path,
+    compress_output: bool,
 ) -> Path | None:
     run_dir = get_run_grib_dir(raw_dir, cycle_hour)
     raw_file = run_dir / f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.csnow_surface.grib2"
-    if raw_file.exists():
+    compressed_file = run_dir / f"{raw_file.name}.gz"
+    target_file = compressed_file if compress_output else raw_file
+    if raw_file.exists() or compressed_file.exists():
         print(f"  using cached {cycle_hour:02d}z f{forecast_hour:02d}", flush=True)
-        return raw_file
+        return compressed_file if compressed_file.exists() else raw_file
 
     print(f"  downloading {cycle_hour:02d}z f{forecast_hour:02d}", flush=True)
     response = session.get(build_url(date_str, cycle_hour, forecast_hour), timeout=timeout)
@@ -102,11 +111,15 @@ def load_or_download_grib(
         return None
 
     run_dir.mkdir(parents=True, exist_ok=True)
-    raw_file.write_bytes(response.content)
-    return raw_file
+    if compress_output:
+        with gzip.open(target_file, "wb", compresslevel=9) as compressed_stream:
+            compressed_stream.write(response.content)
+    else:
+        target_file.write_bytes(response.content)
+    return target_file
 
 
-def archive_gribs(date_str: str, max_forecast_hour: int, timeout: int, output_dir: Path) -> int:
+def archive_gribs(date_str: str, max_forecast_hour: int, timeout: int, output_dir: Path, compress_output: bool) -> int:
     raw_dir = output_dir / date_str / "raw_grib_csnow"
     latest_cycle = detect_latest_cycle(date_str)
     session = requests.Session()
@@ -121,7 +134,9 @@ def archive_gribs(date_str: str, max_forecast_hour: int, timeout: int, output_di
         print(f"Checking run {cycle_hour:02d}z", flush=True)
         miss_streak = 0
         for forecast_hour in range(0, max_forecast_hour + 1):
-            grib_file = load_or_download_grib(session, date_str, cycle_hour, forecast_hour, timeout, raw_dir)
+            grib_file = load_or_download_grib(
+                session, date_str, cycle_hour, forecast_hour, timeout, raw_dir, compress_output
+            )
             if grib_file is None:
                 print(f"  no data for {cycle_hour:02d}z f{forecast_hour:02d}", flush=True)
                 miss_streak += 1
@@ -146,6 +161,7 @@ def main() -> None:
         max_forecast_hour=args.max_forecast_hour,
         timeout=args.timeout,
         output_dir=Path(args.output_dir),
+        compress_output=not args.no_compress,
     )
 
 
