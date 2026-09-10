@@ -52,9 +52,9 @@ ENTIRE_ATMOSPHERE_TRACKED_GRIB_FIELDS = [
     {"request_key": "var_HAIL", "label": "Maximum hail size", "aliases": {"hail"}},
     {"request_key": "var_LTNG", "label": "Lightning", "aliases": {"ltng"}},
     {"request_key": "var_REFC", "label": "Maximum or composite radar reflectivity", "aliases": {"refc", "refd"}},
-    {"request_key": "var_RHPW", "label": "Relative humidity", "aliases": {"rhpw", "param1_242"}, "level_hint": "entire atmosphere", "expected_absence_reason": "This field is encoded with an unknown short name in the default GRIB tables, so the inspector matches it by GRIB parameter metadata."},
+    {"request_key": "var_RHPW", "label": "Relative humidity", "aliases": {"rhpw", "param1_242"}, "display_short_name": "rhpw", "level_hint": "entire atmosphere", "expected_absence_reason": "This field is encoded with an unknown short name in the default GRIB tables, so the inspector matches it by GRIB parameter metadata."},
     {"request_key": "var_TCDC", "label": "Total cloud cover", "aliases": {"tcdc", "tcc"}},
-    {"request_key": "var_TCOLI", "label": "Total column integrated condensate", "aliases": {"tcoli", "param1_70"}, "expected_absence_reason": "This field is encoded with an unknown short name in the default GRIB tables, so the inspector matches it by GRIB parameter metadata."},
+    {"request_key": "var_TCOLI", "label": "Total column integrated condensate", "aliases": {"tcoli", "param1_70"}, "display_short_name": "tcoli", "expected_absence_reason": "This field is encoded with an unknown short name in the default GRIB tables, so the inspector matches it by GRIB parameter metadata."},
     {"request_key": "var_VIL", "label": "Vertically integrated liquid", "aliases": {"vil", "veril"}},
     {"request_key": "lev_entire_atmosphere", "label": "Entire atmosphere level filter", "request_only": True},
 ]
@@ -343,6 +343,20 @@ def get_variable_match_label(name: str, variable: xr.DataArray, dataset_label: s
     return f"{preferred_name} ({dataset_label}{level_suffix})"
 
 
+def apply_match_display_overrides(field: dict[str, object], matched_names: list[str]) -> list[str]:
+    display_short_name = str(field.get("display_short_name", "")).strip()
+    if not display_short_name:
+        return matched_names
+
+    updated_names: list[str] = []
+    for match_name in matched_names:
+        if match_name.startswith("unknown ("):
+            updated_names.append(f"{display_short_name}{match_name[len('unknown'):]}")
+        else:
+            updated_names.append(match_name)
+    return updated_names
+
+
 def get_tracked_fields_for_product(product_key: str) -> list[dict[str, object]]:
     normalized_key, product = get_product_config(product_key)
     tracked_fields_key = product.get("tracked_fields_key", normalized_key)
@@ -394,6 +408,7 @@ def build_tracked_field_summary(
                 for name in [*variable_lookup.get(alias, set()), *message_lookup.get(alias, set())]
             }
         )
+        matched_names = apply_match_display_overrides(field, matched_names)
         if field.get("request_only"):
             status = "request-filter"
         elif matched_names:
