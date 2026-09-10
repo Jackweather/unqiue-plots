@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import contextlib
 import gzip
 from io import BytesIO
 from pathlib import Path
@@ -13,6 +14,7 @@ from zoneinfo import ZoneInfo
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory
+import cfgrib
 import xarray as xr
 
 
@@ -219,7 +221,7 @@ def list_grib_files(path: Path) -> list[Path]:
     return sorted([*path.glob("*.grib2"), *path.glob("*.grib2.gz")])
 
 
-def open_grib_dataset_from_path(dataset_path: Path):
+def open_grib_datasets_from_path(dataset_path: Path) -> list[tuple[xr.Dataset, dict[str, object]]]:
     backend_options = [
         {"indexpath": ""},
         {"indexpath": "", "filter_by_keys": {"stepType": "instant"}},
@@ -229,8 +231,9 @@ def open_grib_dataset_from_path(dataset_path: Path):
 
     for backend_kwargs in backend_options:
         try:
-            dataset = xr.open_dataset(dataset_path, engine="cfgrib", backend_kwargs=backend_kwargs)
-            return dataset, backend_kwargs
+            datasets = cfgrib.open_datasets(dataset_path, backend_kwargs=backend_kwargs)
+            if datasets:
+                return [(dataset, backend_kwargs) for dataset in datasets]
         except Exception as exc:
             last_error = exc
 
@@ -238,10 +241,10 @@ def open_grib_dataset_from_path(dataset_path: Path):
     raise last_error
 
 
-def open_grib_dataset(grib_path: Path):
+def open_grib_datasets(grib_path: Path):
     if grib_path.suffix != ".gz":
-        dataset, backend_kwargs = open_grib_dataset_from_path(grib_path)
-        return dataset, None, backend_kwargs
+        datasets = open_grib_datasets_from_path(grib_path)
+        return datasets, None
 
     with gzip.open(grib_path, "rb") as compressed_stream:
         with tempfile.NamedTemporaryFile(suffix=".grib2", delete=False) as temp_file:
@@ -249,8 +252,8 @@ def open_grib_dataset(grib_path: Path):
             temp_path = Path(temp_file.name)
 
     try:
-        dataset, backend_kwargs = open_grib_dataset_from_path(temp_path)
-        return dataset, temp_path, backend_kwargs
+        datasets = open_grib_datasets_from_path(temp_path)
+        return datasets, temp_path
     except Exception:
         temp_path.unlink(missing_ok=True)
         raise
@@ -260,19 +263,22 @@ def normalize_field_token(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", value.lower())
 
 
-def build_tracked_field_summary(ds: xr.Dataset) -> list[dict[str, object]]:
+def build_tracked_field_summary(datasets: list[tuple[xr.Dataset, dict[str, object]]]) -> list[dict[str, object]]:
     variable_lookup: dict[str, set[str]] = {}
-    for name, variable in ds.data_vars.items():
-        tokens = {
-            normalize_field_token(name),
-            normalize_field_token(str(variable.attrs.get("GRIB_shortName", ""))),
-            normalize_field_token(str(variable.attrs.get("short_name", ""))),
-            normalize_field_token(str(variable.attrs.get("standard_name", ""))),
-            normalize_field_token(str(variable.attrs.get("long_name", ""))),
-            normalize_field_token(str(variable.attrs.get("GRIB_name", ""))),
-        }
-        for token in [token for token in tokens if token]:
-            variable_lookup.setdefault(token, set()).add(name)
+    for dataset_index, (ds, backend_kwargs) in enumerate(datasets, start=1):
+        dataset_label = backend_kwargs.get("filter_by_keys", {}).get("stepType", f"dataset-{dataset_index}")
+        for name, variable in ds.data_vars.items():
+            display_name = f"{name} ({dataset_label})"
+            tokens = {
+                normalize_field_token(name),
+                normalize_field_token(str(variable.attrs.get("GRIB_shortName", ""))),
+                normalize_field_token(str(variable.attrs.get("short_name", ""))),
+                normalize_field_token(str(variable.attrs.get("standard_name", ""))),
+                normalize_field_token(str(variable.attrs.get("long_name", ""))),
+                normalize_field_token(str(variable.attrs.get("GRIB_name", ""))),
+            }
+            for token in [token for token in tokens if token]:
+                variable_lookup.setdefault(token, set()).add(display_name)
 
     summary_rows: list[dict[str, object]] = []
     for field in TRACKED_GRIB_FIELDS:
@@ -299,39 +305,53 @@ def build_tracked_field_summary(ds: xr.Dataset) -> list[dict[str, object]]:
 
 
 def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
-    dataset, temp_path, backend_kwargs = open_grib_dataset(grib_path)
-    ds = dataset
+    opened_datasets, temp_path = open_grib_datasets(grib_path)
     try:
-        dataset_attrs = {key: str(value) for key, value in ds.attrs.items()}
-        source_value = dataset_attrs.get("source")
-        if source_value:
-            dataset_attrs["source"] = Path(source_value).name
-        filter_by_keys = backend_kwargs.get("filter_by_keys")
-        if filter_by_keys:
-            dataset_attrs["filter_by_keys"] = str(filter_by_keys)
-        history_value = dataset_attrs.get("history")
-        if history_value:
-            sanitized_history = re.sub(
-                r'("source"\s*:\s*")([^"]+)(")',
-                lambda match: f'{match.group(1)}{Path(match.group(2)).name}{match.group(3)}',
-                history_value,
-            )
-            sanitized_history = re.sub(
-                r"\s*GRIB to CDM\+CF via cfgrib-[^\s]+/ecCodes-[^\s]+ with\s*",
-                " ",
-                sanitized_history,
-            ).strip()
-            dataset_attrs["history"] = sanitized_history
+        variable_entries: list[dict[str, object]] = []
+        combined_dimensions: dict[str, int] = {}
+        coordinates: list[dict[str, object]] = []
+        attributes: list[dict[str, object]] = []
 
-        return {
-            "tracked_fields": build_tracked_field_summary(ds),
-            "dimensions": [{"name": name, "size": size} for name, size in ds.sizes.items()],
-            "coordinates": [
-                {"name": name, "dims": list(coord.dims), "dtype": str(coord.dtype)}
-                for name, coord in ds.coords.items()
-            ],
-            "variables": [
+        for dataset_index, (ds, backend_kwargs) in enumerate(opened_datasets, start=1):
+            dataset_label = backend_kwargs.get("filter_by_keys", {}).get("stepType", f"dataset-{dataset_index}")
+            for name, size in ds.sizes.items():
+                combined_dimensions[name] = max(combined_dimensions.get(name, 0), size)
+
+            coordinates.extend(
                 {
+                    "dataset": dataset_label,
+                    "name": name,
+                    "dims": list(coord.dims),
+                    "dtype": str(coord.dtype),
+                }
+                for name, coord in ds.coords.items()
+            )
+
+            dataset_attrs = {key: str(value) for key, value in ds.attrs.items()}
+            source_value = dataset_attrs.get("source")
+            if source_value:
+                dataset_attrs["source"] = Path(source_value).name
+            filter_by_keys = backend_kwargs.get("filter_by_keys")
+            if filter_by_keys:
+                dataset_attrs["filter_by_keys"] = str(filter_by_keys)
+            history_value = dataset_attrs.get("history")
+            if history_value:
+                sanitized_history = re.sub(
+                    r'("source"\s*:\s*")([^"]+)(")',
+                    lambda match: f'{match.group(1)}{Path(match.group(2)).name}{match.group(3)}',
+                    history_value,
+                )
+                sanitized_history = re.sub(
+                    r"\s*GRIB to CDM\+CF via cfgrib-[^\s]+/ecCodes-[^\s]+ with\s*",
+                    " ",
+                    sanitized_history,
+                ).strip()
+                dataset_attrs["history"] = sanitized_history
+            attributes.append({"dataset": dataset_label, "attrs": dataset_attrs})
+
+            variable_entries.extend(
+                {
+                    "dataset": dataset_label,
                     "name": name,
                     "dims": list(variable.dims),
                     "shape": list(variable.shape),
@@ -339,11 +359,19 @@ def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
                     "attrs": {key: str(value) for key, value in list(variable.attrs.items())[:8]},
                 }
                 for name, variable in ds.data_vars.items()
-            ],
-            "attributes": dataset_attrs,
+            )
+
+        return {
+            "tracked_fields": build_tracked_field_summary(opened_datasets),
+            "dimensions": [{"name": name, "size": size} for name, size in combined_dimensions.items()],
+            "coordinates": coordinates,
+            "variables": variable_entries,
+            "attributes": attributes,
         }
     finally:
-        ds.close()
+        for ds, _backend_kwargs in opened_datasets:
+            with contextlib.suppress(Exception):
+                ds.close()
         if temp_path is not None:
             temp_path.unlink(missing_ok=True)
 
