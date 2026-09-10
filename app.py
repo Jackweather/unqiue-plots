@@ -215,9 +215,29 @@ def list_grib_files(path: Path) -> list[Path]:
     return sorted([*path.glob("*.grib2"), *path.glob("*.grib2.gz")])
 
 
+def open_grib_dataset_from_path(dataset_path: Path):
+    backend_options = [
+        {"indexpath": ""},
+        {"indexpath": "", "filter_by_keys": {"stepType": "instant"}},
+        {"indexpath": "", "filter_by_keys": {"stepType": "accum"}},
+    ]
+    last_error: Exception | None = None
+
+    for backend_kwargs in backend_options:
+        try:
+            dataset = xr.open_dataset(dataset_path, engine="cfgrib", backend_kwargs=backend_kwargs)
+            return dataset, backend_kwargs
+        except Exception as exc:
+            last_error = exc
+
+    assert last_error is not None
+    raise last_error
+
+
 def open_grib_dataset(grib_path: Path):
     if grib_path.suffix != ".gz":
-        return xr.open_dataset(grib_path, engine="cfgrib", backend_kwargs={"indexpath": ""})
+        dataset, backend_kwargs = open_grib_dataset_from_path(grib_path)
+        return dataset, None, backend_kwargs
 
     with gzip.open(grib_path, "rb") as compressed_stream:
         with tempfile.NamedTemporaryFile(suffix=".grib2", delete=False) as temp_file:
@@ -225,20 +245,24 @@ def open_grib_dataset(grib_path: Path):
             temp_path = Path(temp_file.name)
 
     try:
-        return xr.open_dataset(temp_path, engine="cfgrib", backend_kwargs={"indexpath": ""})
+        dataset, backend_kwargs = open_grib_dataset_from_path(temp_path)
+        return dataset, temp_path, backend_kwargs
     except Exception:
         temp_path.unlink(missing_ok=True)
         raise
 
 
 def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
-    dataset = open_grib_dataset(grib_path)
+    dataset, temp_path, backend_kwargs = open_grib_dataset(grib_path)
+    ds = dataset
     try:
-        ds = dataset
         dataset_attrs = {key: str(value) for key, value in ds.attrs.items()}
         source_value = dataset_attrs.get("source")
         if source_value:
             dataset_attrs["source"] = Path(source_value).name
+        filter_by_keys = backend_kwargs.get("filter_by_keys")
+        if filter_by_keys:
+            dataset_attrs["filter_by_keys"] = str(filter_by_keys)
         history_value = dataset_attrs.get("history")
         if history_value:
             sanitized_history = re.sub(
@@ -273,12 +297,8 @@ def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
         }
     finally:
         ds.close()
-        if grib_path.suffix == ".gz":
-            source_value = getattr(getattr(ds, "encoding", {}), "get", None)
-            if source_value is not None:
-                temp_source = ds.encoding.get("source")
-                if temp_source:
-                    Path(temp_source).unlink(missing_ok=True)
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
 
 
 def get_raw_grib_dir(date_str: str, product_key: str) -> Path:
