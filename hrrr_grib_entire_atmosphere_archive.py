@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import gzip
+import lzma
 from pathlib import Path
 
 import requests
@@ -13,6 +14,7 @@ DEFAULT_DATE_FORMAT = "%Y%m%d"
 DEFAULT_OUTPUT_DIR = "/var/data/output"
 DEFAULT_TIMEOUT = 60
 DEFAULT_MAX_FORECAST_HOUR = 18
+DEFAULT_COMPRESSION = "gzip"
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,9 +44,15 @@ def parse_args() -> argparse.Namespace:
         help="HTTP timeout in seconds for each request.",
     )
     parser.add_argument(
+        "--compression",
+        choices=("gzip", "xz", "none"),
+        default=DEFAULT_COMPRESSION,
+        help="Compression format for saved files. Use xz for smaller files or none for plain .grib2 output.",
+    )
+    parser.add_argument(
         "--no-compress",
         action="store_true",
-        help="Store downloaded files as .grib2 instead of .grib2.gz.",
+        help="Deprecated alias for --compression none.",
     )
     return parser.parse_args()
 
@@ -81,6 +89,28 @@ def detect_latest_cycle(date_str: str) -> int:
     return 23 if target_date.date() < now_utc.date() else now_utc.hour
 
 
+def get_compressed_file(raw_file: Path, compression: str) -> Path:
+    if compression == "gzip":
+        return raw_file.with_name(f"{raw_file.name}.gz")
+    if compression == "xz":
+        return raw_file.with_name(f"{raw_file.name}.xz")
+    return raw_file
+
+
+def write_grib_file(target_file: Path, content: bytes, compression: str) -> None:
+    if compression == "gzip":
+        with gzip.open(target_file, "wb", compresslevel=9) as compressed_stream:
+            compressed_stream.write(content)
+        return
+
+    if compression == "xz":
+        with lzma.open(target_file, "wb", preset=9 | lzma.PRESET_EXTREME) as compressed_stream:
+            compressed_stream.write(content)
+        return
+
+    target_file.write_bytes(content)
+
+
 def load_or_download_grib(
     session: requests.Session,
     date_str: str,
@@ -88,15 +118,20 @@ def load_or_download_grib(
     forecast_hour: int,
     timeout: int,
     raw_dir: Path,
-    compress_output: bool,
+    compression: str,
 ) -> Path | None:
     run_dir = get_run_grib_dir(raw_dir, cycle_hour)
     raw_file = run_dir / f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.entire_atmosphere.grib2"
-    compressed_file = run_dir / f"{raw_file.name}.gz"
-    target_file = compressed_file if compress_output else raw_file
-    if raw_file.exists() or compressed_file.exists():
+    cached_files = [
+        raw_file,
+        raw_file.with_name(f"{raw_file.name}.gz"),
+        raw_file.with_name(f"{raw_file.name}.xz"),
+    ]
+    existing_file = next((path for path in cached_files if path.exists()), None)
+    target_file = get_compressed_file(raw_file, compression)
+    if existing_file is not None:
         print(f"  using cached {cycle_hour:02d}z f{forecast_hour:02d}", flush=True)
-        return compressed_file if compressed_file.exists() else raw_file
+        return existing_file
 
     print(f"  downloading {cycle_hour:02d}z f{forecast_hour:02d}", flush=True)
     response = session.get(build_url(date_str, cycle_hour, forecast_hour), timeout=timeout)
@@ -109,15 +144,11 @@ def load_or_download_grib(
         return None
 
     run_dir.mkdir(parents=True, exist_ok=True)
-    if compress_output:
-        with gzip.open(target_file, "wb", compresslevel=9) as compressed_stream:
-            compressed_stream.write(response.content)
-    else:
-        target_file.write_bytes(response.content)
+    write_grib_file(target_file, response.content, compression)
     return target_file
 
 
-def archive_gribs(date_str: str, max_forecast_hour: int, timeout: int, output_dir: Path, compress_output: bool) -> int:
+def archive_gribs(date_str: str, max_forecast_hour: int, timeout: int, output_dir: Path, compression: str) -> int:
     raw_dir = output_dir / date_str / "raw_grib_entire_atmosphere"
     latest_cycle = detect_latest_cycle(date_str)
     session = requests.Session()
@@ -133,7 +164,7 @@ def archive_gribs(date_str: str, max_forecast_hour: int, timeout: int, output_di
         miss_streak = 0
         for forecast_hour in range(0, max_forecast_hour + 1):
             grib_file = load_or_download_grib(
-                session, date_str, cycle_hour, forecast_hour, timeout, raw_dir, compress_output
+                session, date_str, cycle_hour, forecast_hour, timeout, raw_dir, compression
             )
             if grib_file is None:
                 print(f"  no data for {cycle_hour:02d}z f{forecast_hour:02d}", flush=True)
@@ -154,12 +185,13 @@ def archive_gribs(date_str: str, max_forecast_hour: int, timeout: int, output_di
 
 def main() -> None:
     args = parse_args()
+    compression = "none" if args.no_compress else args.compression
     archive_gribs(
         date_str=args.date,
         max_forecast_hour=args.max_forecast_hour,
         timeout=args.timeout,
         output_dir=Path(args.output_dir),
-        compress_output=not args.no_compress,
+        compression=compression,
     )
 
 
