@@ -170,7 +170,7 @@
                         <p class="eyebrow">Forecast Archive</p>
                         <h1>View archived HRRR {{ selected_product_label|lower }} GRIB files.</h1>
                     </div>
-                    <p>Switch between temperature and total precipitation, review archived runs by date, and inspect dataset contents from the same workflow.</p>
+                    <p>Switch between archived HRRR datasets, review runs by date, and inspect dataset contents from the same workflow.</p>
                     <div class="hero-stats">
                         <div class="stat"><span>Available dates</span><strong>{{ available_dates|length }}</strong></div>
                         <div class="stat"><span>Archived runs</span><strong>{{ run_entries|length }}</strong></div>
@@ -312,9 +312,10 @@
                 {% endif %}
                 <section class="sidebar-card">
                     <h2>Downloader Workflow</h2>
-                    <p>The main workflow now uses the combined surface downloader, while older archived dataset groups can still be viewed from the legacy section.</p>
+                    <p>Task 1 now downloads both the combined surface dataset and the entire-atmosphere severe-weather dataset, while older archived groups remain available below.</p>
                     <div class="download-list">
-                        <div class="download-item"><strong>Combined surface</strong><span>Current downloader and archive target for new runs.</span></div>
+                        <div class="download-item"><strong>Combined surface</strong><span>Current downloader and archive target for tracked surface fields.</span></div>
+                        <div class="download-item"><strong>Entire atmosphere</strong><span>Task 1 also archives hail, lightning, reflectivity, cloud cover, condensate, VIL, and related severe-weather fields.</span></div>
                         <div class="download-item"><strong>Legacy datasets</strong><span>Older archive folders remain inspectable from the homepage.</span></div>
                     </div>
                 </section>
