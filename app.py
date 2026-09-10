@@ -386,7 +386,7 @@ def build_tracked_field_summary(
 
     summary_rows: list[dict[str, object]] = []
     for field in get_tracked_fields_for_product(product_key):
-        aliases = field.get("aliases", set())
+        aliases = {normalize_field_token(alias) for alias in field.get("aliases", set())}
         matched_names = sorted(
             {
                 name
