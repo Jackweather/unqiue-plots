@@ -29,6 +29,48 @@ PRODUCTS = {
         "archive_dir": "raw_grib_full_surface",
     },
 }
+LEGACY_PRODUCTS = {
+    "temp_2m": {
+        "label": "2 m Temperature",
+        "short_label": "Temperature",
+        "archive_dir": "raw_grib",
+    },
+    "total_precip": {
+        "label": "Total Precipitation",
+        "short_label": "Total Precip",
+        "archive_dir": "raw_grib_total_precip",
+    },
+    "surface_gust": {
+        "label": "Surface Wind Gust",
+        "short_label": "Wind Gust",
+        "archive_dir": "raw_grib_gust",
+    },
+    "surface_cape": {
+        "label": "Surface CAPE",
+        "short_label": "CAPE",
+        "archive_dir": "raw_grib_cape",
+    },
+    "surface_cfrzr": {
+        "label": "Surface Freezing Rain",
+        "short_label": "Freezing Rain",
+        "archive_dir": "raw_grib_cfrzr",
+    },
+    "surface_cicep": {
+        "label": "Surface Ice Pellets",
+        "short_label": "Ice Pellets",
+        "archive_dir": "raw_grib_cicep",
+    },
+    "surface_csnow": {
+        "label": "Surface Snow",
+        "short_label": "Snow",
+        "archive_dir": "raw_grib_csnow",
+    },
+    "surface_hpbl_prate_snod_vis_weasd": {
+        "label": "Surface HPBL PRATE SNOD VIS WEASD",
+        "short_label": "HPBL + PRATE + SNOD + VIS + WEASD",
+        "archive_dir": "raw_grib_hpbl_prate_snod_vis_weasd",
+    },
+}
 DEFAULT_PRODUCT_KEY = "surface_full"
 
 
@@ -43,8 +85,33 @@ def get_date_directories() -> list[Path]:
 
 
 def get_product_config(product_key: str | None) -> tuple[str, dict[str, str]]:
-    normalized_key = product_key if product_key in PRODUCTS else DEFAULT_PRODUCT_KEY
-    return normalized_key, PRODUCTS[normalized_key]
+    all_products = PRODUCTS | LEGACY_PRODUCTS
+    normalized_key = product_key if product_key in all_products else DEFAULT_PRODUCT_KEY
+    return normalized_key, all_products[normalized_key]
+
+
+def list_legacy_products(date_str: str | None) -> list[dict[str, object]]:
+    if not date_str:
+        return []
+
+    legacy_entries: list[dict[str, object]] = []
+    for product_key, product in LEGACY_PRODUCTS.items():
+        raw_dir = OUTPUT_DIR / date_str / product["archive_dir"]
+        if not raw_dir.exists():
+            continue
+
+        run_count = len([path for path in raw_dir.iterdir() if path.is_dir()])
+        legacy_entries.append(
+            {
+                "key": product_key,
+                "label": product["label"],
+                "short_label": product["short_label"],
+                "archive_dir": product["archive_dir"],
+                "run_count": run_count,
+            }
+        )
+
+    return legacy_entries
 
 
 def list_raw_grib_runs(date_str: str, product_key: str) -> list[dict[str, str | int]]:
@@ -216,6 +283,7 @@ def index() -> str:
     if not selected_download_dates and selected_date in downloadable_dates:
         selected_download_dates = [selected_date]
     run_entries = list_raw_grib_runs(selected_date, selected_product) if selected_date else []
+    legacy_products = list_legacy_products(selected_date)
 
     return render_template(
         "index.html",
@@ -228,6 +296,7 @@ def index() -> str:
         selected_download_dates=selected_download_dates,
         run_entries=run_entries,
         raw_grib_available=bool(selected_date and get_raw_grib_dir(selected_date, selected_product).exists()),
+        legacy_products=legacy_products,
     )
 
 
