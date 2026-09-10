@@ -75,6 +75,13 @@ PRODUCTS = {
         "script": "hrrr_grib_csnow_sfc_archive.py",
         "render_script": "/opt/render/project/src/hrrr_grib_csnow_sfc_archive.py",
     },
+    "surface_hpbl_prate_snod_vis_weasd": {
+        "label": "Surface HPBL PRATE SNOD VIS WEASD",
+        "short_label": "HPBL + PRATE + SNOD + VIS + WEASD",
+        "archive_dir": "raw_grib_hpbl_prate_snod_vis_weasd",
+        "script": "hrrr_grib_hpbl_prate_snod_vis_weasd_sfc_archive.py",
+        "render_script": "/opt/render/project/src/hrrr_grib_hpbl_prate_snod_vis_weasd_sfc_archive.py",
+    },
 }
 DEFAULT_PRODUCT_KEY = "temp_2m"
 
@@ -444,6 +451,10 @@ def run_task1():
         resolve_script_path(
             "/opt/render/project/src/hrrr_grib_csnow_sfc_archive.py",
             "hrrr_grib_csnow_sfc_archive.py",
+        ),
+        resolve_script_path(
+            "/opt/render/project/src/hrrr_grib_hpbl_prate_snod_vis_weasd_sfc_archive.py",
+            "hrrr_grib_hpbl_prate_snod_vis_weasd_sfc_archive.py",
         ),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
