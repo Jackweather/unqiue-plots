@@ -23,7 +23,7 @@ CONUS_BOUNDS = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Download HRRR surface categorical snow GRIB files and save them in the raw archive layout."
+        description="Download HRRR surface wind gust GRIB files and save them in the raw archive layout."
     )
     parser.add_argument(
         "--date",
@@ -59,7 +59,7 @@ def build_url(date_str: str, cycle_hour: int, forecast_hour: int) -> str:
     query = {
         "dir": f"/hrrr.{date_str}/conus",
         "file": f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.grib2",
-        "var_CSNOW": "on",
+        "var_GUST": "on",
         "lev_surface": "on",
         "subregion": "1",
         **{key: str(value) for key, value in CONUS_BOUNDS.items()},
@@ -93,7 +93,7 @@ def load_or_download_grib(
     compress_output: bool,
 ) -> Path | None:
     run_dir = get_run_grib_dir(raw_dir, cycle_hour)
-    raw_file = run_dir / f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.csnow_surface.grib2"
+    raw_file = run_dir / f"hrrr.t{cycle_hour:02d}z.wrfsfcf{forecast_hour:02d}.gust_surface.grib2"
     compressed_file = run_dir / f"{raw_file.name}.gz"
     target_file = compressed_file if compress_output else raw_file
     if raw_file.exists() or compressed_file.exists():
@@ -120,13 +120,13 @@ def load_or_download_grib(
 
 
 def archive_gribs(date_str: str, max_forecast_hour: int, timeout: int, output_dir: Path, compress_output: bool) -> int:
-    raw_dir = output_dir / date_str / "raw_grib_csnow"
+    raw_dir = output_dir / date_str / "raw_grib_gust"
     latest_cycle = detect_latest_cycle(date_str)
     session = requests.Session()
-    session.headers.update({"User-Agent": "hrrr-grib-csnow-archive/1.0"})
+    session.headers.update({"User-Agent": "hrrr-grib-gust-archive/1.0"})
 
     saved_files = 0
-    print(f"Starting HRRR surface categorical snow GRIB archive run for {date_str}", flush=True)
+    print(f"Starting HRRR surface gust GRIB archive run for {date_str}", flush=True)
     print(f"Output directory: {output_dir}", flush=True)
     print(f"Archiving runs from 00z through {latest_cycle:02d}z", flush=True)
 
@@ -148,7 +148,7 @@ def archive_gribs(date_str: str, max_forecast_hour: int, timeout: int, output_di
             miss_streak = 0
 
     if saved_files == 0:
-        raise SystemExit("No HRRR surface categorical snow GRIB files were available for the requested UTC date.")
+        raise SystemExit("No HRRR surface gust GRIB files were available for the requested UTC date.")
 
     print(f"Saved {saved_files} GRIB files in: {raw_dir}", flush=True)
     return saved_files
