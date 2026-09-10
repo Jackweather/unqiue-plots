@@ -19,7 +19,6 @@ import xarray as xr
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path("/var/data")
 OUTPUT_DIR = DATA_DIR / "output"
-LOG_DIR = DATA_DIR / "logs"
 RENDER_BASE_DIR = Path("/opt/render/project/src/")
 EASTERN_TIMEZONE = ZoneInfo("America/New_York")
 
@@ -81,6 +80,11 @@ def build_task_run_id() -> str:
     return datetime.now(EASTERN_TIMEZONE).strftime("task1-%Y%m%d-%H%M%S")
 
 
+def build_task_summary_log_path(task_number: int) -> Path:
+    timestamp = datetime.now(EASTERN_TIMEZONE).strftime("%y%m%d_%I%M%S%p").lower()
+    return BASE_DIR / f"task{task_number}_summary_{timestamp}.log"
+
+
 def resolve_script_path(render_path: str, local_name: str) -> Path:
     render_script = Path(render_path)
     if render_script.exists():
@@ -94,11 +98,11 @@ def resolve_script_path(render_path: str, local_name: str) -> Path:
 
 
 def run_scripts(scripts: list[Path], task_run_id: str, task_number: int) -> None:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    log_path = LOG_DIR / f"{task_run_id}.log"
+    log_path = build_task_summary_log_path(task_number)
 
     with log_path.open("a", encoding="utf-8") as log_file:
         started_at = datetime.now(EASTERN_TIMEZONE).isoformat()
+        log_file.write(f"Task run id: {task_run_id}\n")
         log_file.write(f"Starting task{task_number} at {started_at}\n")
         log_file.flush()
 
