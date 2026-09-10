@@ -263,6 +263,30 @@
                     </form>
                 </section>
                 {% endif %}
+                {% if legacy_products %}
+                <section class="section-card">
+                    <div class="section-header">
+                        <div>
+                            <span class="section-kicker">Legacy datasets</span>
+                            <h2>Older archived dataset views</h2>
+                            <p>These archived products are still available to inspect even though the downloader now only keeps the combined surface workflow.</p>
+                        </div>
+                        <div class="meta-copy">{{ legacy_products|length }} dataset{% if legacy_products|length != 1 %}s{% endif %}</div>
+                    </div>
+                    <div class="archive-grid">
+                        {% for legacy in legacy_products %}
+                        <article class="archive-card">
+                            <span class="archive-badge">Legacy</span>
+                            <strong>{{ legacy.label }}</strong>
+                            <span>{{ legacy.run_count }} run{% if legacy.run_count != 1 %}s{% endif %} archived for {{ selected_date }}</span>
+                            <div class="archive-actions">
+                                <a class="inspect-link" href="/?product={{ legacy.key }}&date={{ selected_date }}">Open Dataset View</a>
+                            </div>
+                        </article>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endif %}
             </div>
             <aside class="sidebar">
                 <section class="sidebar-card">
@@ -288,10 +312,10 @@
                 {% endif %}
                 <section class="sidebar-card">
                     <h2>Downloader Workflow</h2>
-                    <p>The main workflow now supports both temperature and total precipitation with the same archive and dataset inspector.</p>
+                    <p>The main workflow now uses the combined surface downloader, while older archived dataset groups can still be viewed from the legacy section.</p>
                     <div class="download-list">
-                        <div class="download-item"><strong>Temperature</strong><span>Archived under the 2 m temperature GRIB workflow.</span></div>
-                        <div class="download-item"><strong>Total precip</strong><span>Archived separately with the same run and dataset inspection flow.</span></div>
+                        <div class="download-item"><strong>Combined surface</strong><span>Current downloader and archive target for new runs.</span></div>
+                        <div class="download-item"><strong>Legacy datasets</strong><span>Older archive folders remain inspectable from the homepage.</span></div>
                     </div>
                 </section>
             </aside>
