@@ -85,6 +85,13 @@ def build_task_summary_log_path(task_number: int) -> Path:
     return BASE_DIR / f"task{task_number}_summary_{timestamp}.log"
 
 
+def format_duration_hhmmss(started_at: datetime, finished_at: datetime) -> str:
+    total_seconds = max(0, int((finished_at - started_at).total_seconds()))
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}{minutes:02d}{seconds:02d}"
+
+
 def resolve_script_path(render_path: str, local_name: str) -> Path:
     render_script = Path(render_path)
     if render_script.exists():
@@ -101,9 +108,9 @@ def run_scripts(scripts: list[Path], task_run_id: str, task_number: int) -> None
     log_path = build_task_summary_log_path(task_number)
 
     with log_path.open("a", encoding="utf-8") as log_file:
-        started_at = datetime.now(EASTERN_TIMEZONE).isoformat()
+        started_at = datetime.now(EASTERN_TIMEZONE)
         log_file.write(f"Task run id: {task_run_id}\n")
-        log_file.write(f"Starting task{task_number} at {started_at}\n")
+        log_file.write(f"Starting task{task_number} at {started_at.isoformat()}\n")
         log_file.flush()
 
         for script_path in scripts:
@@ -116,8 +123,9 @@ def run_scripts(scripts: list[Path], task_run_id: str, task_number: int) -> None
                 check=True,
             )
 
-        finished_at = datetime.now(EASTERN_TIMEZONE).isoformat()
-        log_file.write(f"Finished task{task_number} at {finished_at}\n")
+        finished_at = datetime.now(EASTERN_TIMEZONE)
+        log_file.write(f"Finished task{task_number} at {finished_at.isoformat()}\n")
+        log_file.write(f"Duration: {format_duration_hhmmss(started_at, finished_at)}\n")
         log_file.flush()
 
 
