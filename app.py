@@ -26,7 +26,7 @@ EASTERN_TIMEZONE = ZoneInfo("America/New_York")
 
 app = Flask(__name__)
 
-TRACKED_GRIB_FIELDS = [
+SURFACE_TRACKED_GRIB_FIELDS = [
     {"request_key": "var_4LFTX", "label": "Best 4-layer lifted index", "aliases": {"4lftx"}, "level_hint": "pressureFromGroundLayer 18000", "expected_absence_reason": "Excluded when the request is limited to lev_surface=on."},
     {"request_key": "var_TMP", "label": "Temperature", "aliases": {"tmp", "t", "2t"}, "level_hint": "2 m above ground"},
     {"request_key": "var_APCP", "label": "Total precipitation", "aliases": {"apcp", "tp"}},
@@ -47,11 +47,34 @@ TRACKED_GRIB_FIELDS = [
     {"request_key": "subregion", "label": "CONUS subregion crop", "request_only": True},
 ]
 
+ENTIRE_ATMOSPHERE_TRACKED_GRIB_FIELDS = [
+    {"request_key": "var_HAIL", "label": "Maximum hail size", "aliases": {"hail"}},
+    {"request_key": "var_LTNG", "label": "Lightning", "aliases": {"ltng"}},
+    {"request_key": "var_REFC", "label": "Maximum or composite radar reflectivity", "aliases": {"refc", "refd"}},
+    {"request_key": "var_RHPW", "label": "Relative humidity", "aliases": {"rhpw", "param1_242"}, "level_hint": "entire atmosphere", "expected_absence_reason": "This field is encoded with an unknown short name in the default GRIB tables, so the inspector matches it by GRIB parameter metadata."},
+    {"request_key": "var_TCDC", "label": "Total cloud cover", "aliases": {"tcdc", "tcc"}},
+    {"request_key": "var_TCOLI", "label": "Total column integrated condensate", "aliases": {"tcoli", "param1_70"}, "expected_absence_reason": "This field is encoded with an unknown short name in the default GRIB tables, so the inspector matches it by GRIB parameter metadata."},
+    {"request_key": "var_VIL", "label": "Vertically integrated liquid", "aliases": {"vil", "veril"}},
+    {"request_key": "lev_entire_atmosphere", "label": "Entire atmosphere level filter", "request_only": True},
+]
+
+TRACKED_GRIB_FIELDS_BY_PRODUCT = {
+    "surface_full": SURFACE_TRACKED_GRIB_FIELDS,
+    "entire_atmosphere": ENTIRE_ATMOSPHERE_TRACKED_GRIB_FIELDS,
+}
+
 PRODUCTS = {
     "surface_full": {
         "label": "Combined Surface Dataset",
         "short_label": "Full Surface",
         "archive_dir": "raw_grib_full_surface",
+        "tracked_fields_key": "surface_full",
+    },
+    "entire_atmosphere": {
+        "label": "Entire Atmosphere Severe Weather Dataset",
+        "short_label": "Entire Atmosphere",
+        "archive_dir": "raw_grib_entire_atmosphere",
+        "tracked_fields_key": "entire_atmosphere",
     },
 }
 LEGACY_PRODUCTS = {
@@ -275,7 +298,15 @@ def get_variable_match_label(name: str, variable: xr.DataArray, dataset_label: s
     return f"{preferred_name} ({dataset_label}{level_suffix})"
 
 
-def build_tracked_field_summary(datasets: list[tuple[xr.Dataset, dict[str, object]]]) -> list[dict[str, object]]:
+def get_tracked_fields_for_product(product_key: str) -> list[dict[str, object]]:
+    normalized_key, product = get_product_config(product_key)
+    tracked_fields_key = product.get("tracked_fields_key", normalized_key)
+    return TRACKED_GRIB_FIELDS_BY_PRODUCT.get(tracked_fields_key, SURFACE_TRACKED_GRIB_FIELDS)
+
+
+def build_tracked_field_summary(
+    datasets: list[tuple[xr.Dataset, dict[str, object]]], product_key: str
+) -> list[dict[str, object]]:
     variable_lookup: dict[str, set[str]] = {}
     for dataset_index, (ds, backend_kwargs) in enumerate(datasets, start=1):
         dataset_label = backend_kwargs.get("filter_by_keys", {}).get("stepType", f"dataset-{dataset_index}")
@@ -288,12 +319,15 @@ def build_tracked_field_summary(datasets: list[tuple[xr.Dataset, dict[str, objec
                 normalize_field_token(str(variable.attrs.get("standard_name", ""))),
                 normalize_field_token(str(variable.attrs.get("long_name", ""))),
                 normalize_field_token(str(variable.attrs.get("GRIB_name", ""))),
+                normalize_field_token(
+                    f"param{variable.attrs.get('GRIB_parameterCategory', '')}_{variable.attrs.get('GRIB_parameterNumber', '')}"
+                ),
             }
             for token in [token for token in tokens if token]:
                 variable_lookup.setdefault(token, set()).add(display_name)
 
     summary_rows: list[dict[str, object]] = []
-    for field in TRACKED_GRIB_FIELDS:
+    for field in get_tracked_fields_for_product(product_key):
         aliases = field.get("aliases", set())
         matched_names = sorted({name for alias in aliases for name in variable_lookup.get(alias, set())})
         if field.get("request_only"):
@@ -317,7 +351,7 @@ def build_tracked_field_summary(datasets: list[tuple[xr.Dataset, dict[str, objec
     return summary_rows
 
 
-def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
+def summarize_grib_dataset(grib_path: Path, product_key: str) -> dict[str, object]:
     opened_datasets, temp_path = open_grib_datasets(grib_path)
     try:
         variable_entries: list[dict[str, object]] = []
@@ -375,7 +409,7 @@ def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
             )
 
         return {
-            "tracked_fields": build_tracked_field_summary(opened_datasets),
+            "tracked_fields": build_tracked_field_summary(opened_datasets, product_key),
             "dimensions": [{"name": name, "size": size} for name, size in combined_dimensions.items()],
             "coordinates": coordinates,
             "variables": variable_entries,
@@ -507,6 +541,10 @@ def run_task1():
             "/opt/render/project/src/hrrr_grib_full_surface_archive.py",
             "hrrr_grib_full_surface_archive.py",
         ),
+        resolve_script_path(
+            "/opt/render/project/src/hrrr_grib_entire_atmosphere_archive.py",
+            "hrrr_grib_entire_atmosphere_archive.py",
+        ),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
     return f"Task started in background as {task_run_id}.", 200
@@ -525,7 +563,7 @@ def view_grib_dataset() -> str:
     summary: dict[str, object] | None = None
     load_error: str | None = None
     try:
-        summary = summarize_grib_dataset(selected_file)
+        summary = summarize_grib_dataset(selected_file, selected_product)
     except Exception as exc:
         load_error = str(exc)
 
