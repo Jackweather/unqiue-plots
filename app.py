@@ -5,7 +5,10 @@ import gzip
 from io import BytesIO
 from pathlib import Path
 import re
+import subprocess
+import sys
 import tempfile
+import threading
 from zoneinfo import ZoneInfo
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -72,6 +75,46 @@ LEGACY_PRODUCTS = {
     },
 }
 DEFAULT_PRODUCT_KEY = "surface_full"
+
+
+def build_task_run_id() -> str:
+    return datetime.now(EASTERN_TIMEZONE).strftime("task1-%Y%m%d-%H%M%S")
+
+
+def resolve_script_path(render_path: str, local_name: str) -> Path:
+    render_script = Path(render_path)
+    if render_script.exists():
+        return render_script
+
+    local_script = BASE_DIR / local_name
+    if local_script.exists():
+        return local_script
+
+    abort(500, description=f"Script not found: {local_name}")
+
+
+def run_scripts(scripts: list[Path], task_run_id: str, task_number: int) -> None:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = LOG_DIR / f"{task_run_id}.log"
+
+    with log_path.open("a", encoding="utf-8") as log_file:
+        started_at = datetime.now(EASTERN_TIMEZONE).isoformat()
+        log_file.write(f"Starting task{task_number} at {started_at}\n")
+        log_file.flush()
+
+        for script_path in scripts:
+            log_file.write(f"Running {script_path.name}\n")
+            log_file.flush()
+            subprocess.run(
+                [sys.executable, str(script_path)],
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                check=True,
+            )
+
+        finished_at = datetime.now(EASTERN_TIMEZONE).isoformat()
+        log_file.write(f"Finished task{task_number} at {finished_at}\n")
+        log_file.flush()
 
 
 def get_date_directories() -> list[Path]:
@@ -337,6 +380,19 @@ def download_raw_grib_archive():
         as_attachment=True,
         download_name=download_name,
     )
+
+
+@app.route("/run-task1")
+def run_task1():
+    task_run_id = build_task_run_id()
+    scripts = [
+        resolve_script_path(
+            "/opt/render/project/src/hrrr_grib_full_surface_archive.py",
+            "hrrr_grib_full_surface_archive.py",
+        ),
+    ]
+    threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
+    return f"Task started in background as {task_run_id}.", 200
 
 
 @app.route("/grib-dataset")
