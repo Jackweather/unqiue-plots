@@ -24,6 +24,27 @@ EASTERN_TIMEZONE = ZoneInfo("America/New_York")
 
 app = Flask(__name__)
 
+TRACKED_GRIB_FIELDS = [
+    {"request_key": "var_4LFTX", "label": "Best 4-layer lifted index", "aliases": {"4lftx"}},
+    {"request_key": "var_TMP", "label": "Temperature", "aliases": {"tmp", "t"}, "level_hint": "2 m above ground"},
+    {"request_key": "var_APCP", "label": "Total precipitation", "aliases": {"apcp", "tp"}},
+    {"request_key": "var_GUST", "label": "Wind gust", "aliases": {"gust", "i10fg"}},
+    {"request_key": "var_CAPE", "label": "Convective available potential energy", "aliases": {"cape"}},
+    {"request_key": "var_CFRZR", "label": "Categorical freezing rain", "aliases": {"cfrzr"}},
+    {"request_key": "var_CICEP", "label": "Categorical ice pellets", "aliases": {"cicep"}},
+    {"request_key": "var_CSNOW", "label": "Categorical snow", "aliases": {"csnow"}},
+    {"request_key": "var_FRICV", "label": "Friction velocity", "aliases": {"fricv"}},
+    {"request_key": "var_HGT", "label": "Geopotential height", "aliases": {"hgt", "gh"}, "level_hint": "surface"},
+    {"request_key": "var_HPBL", "label": "Planetary boundary layer height", "aliases": {"hpbl"}},
+    {"request_key": "var_PRATE", "label": "Precipitation rate", "aliases": {"prate"}},
+    {"request_key": "var_SNOD", "label": "Snow depth", "aliases": {"snod", "sd"}},
+    {"request_key": "var_SNOWC", "label": "Snow cover", "aliases": {"snowc"}},
+    {"request_key": "var_VIS", "label": "Visibility", "aliases": {"vis"}},
+    {"request_key": "var_WEASD", "label": "Water equivalent of accumulated snow depth", "aliases": {"weasd", "sdwe"}},
+    {"request_key": "lev_surface", "label": "Surface level filter", "request_only": True},
+    {"request_key": "subregion", "label": "CONUS subregion crop", "request_only": True},
+]
+
 PRODUCTS = {
     "surface_full": {
         "label": "Combined Surface Dataset",
@@ -235,6 +256,48 @@ def open_grib_dataset(grib_path: Path):
         raise
 
 
+def normalize_field_token(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+
+def build_tracked_field_summary(ds: xr.Dataset) -> list[dict[str, object]]:
+    variable_lookup: dict[str, set[str]] = {}
+    for name, variable in ds.data_vars.items():
+        tokens = {
+            normalize_field_token(name),
+            normalize_field_token(str(variable.attrs.get("GRIB_shortName", ""))),
+            normalize_field_token(str(variable.attrs.get("short_name", ""))),
+            normalize_field_token(str(variable.attrs.get("standard_name", ""))),
+            normalize_field_token(str(variable.attrs.get("long_name", ""))),
+            normalize_field_token(str(variable.attrs.get("GRIB_name", ""))),
+        }
+        for token in [token for token in tokens if token]:
+            variable_lookup.setdefault(token, set()).add(name)
+
+    summary_rows: list[dict[str, object]] = []
+    for field in TRACKED_GRIB_FIELDS:
+        aliases = field.get("aliases", set())
+        matched_names = sorted({name for alias in aliases for name in variable_lookup.get(alias, set())})
+        if field.get("request_only"):
+            status = "request-filter"
+        elif matched_names:
+            status = "present"
+        else:
+            status = "missing"
+
+        summary_rows.append(
+            {
+                "request_key": field["request_key"],
+                "label": field["label"],
+                "status": status,
+                "matches": matched_names,
+                "level_hint": field.get("level_hint", ""),
+            }
+        )
+
+    return summary_rows
+
+
 def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
     dataset, temp_path, backend_kwargs = open_grib_dataset(grib_path)
     ds = dataset
@@ -261,6 +324,7 @@ def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
             dataset_attrs["history"] = sanitized_history
 
         return {
+            "tracked_fields": build_tracked_field_summary(ds),
             "dimensions": [{"name": name, "size": size} for name, size in ds.sizes.items()],
             "coordinates": [
                 {"name": name, "dims": list(coord.dims), "dtype": str(coord.dtype)}
