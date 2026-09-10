@@ -27,7 +27,7 @@ EASTERN_TIMEZONE = ZoneInfo("America/New_York")
 app = Flask(__name__)
 
 TRACKED_GRIB_FIELDS = [
-    {"request_key": "var_4LFTX", "label": "Best 4-layer lifted index", "aliases": {"4lftx"}},
+    {"request_key": "var_4LFTX", "label": "Best 4-layer lifted index", "aliases": {"4lftx"}, "level_hint": "pressureFromGroundLayer 18000", "expected_absence_reason": "Excluded when the request is limited to lev_surface=on."},
     {"request_key": "var_TMP", "label": "Temperature", "aliases": {"tmp", "t"}, "level_hint": "2 m above ground"},
     {"request_key": "var_APCP", "label": "Total precipitation", "aliases": {"apcp", "tp"}},
     {"request_key": "var_GUST", "label": "Wind gust", "aliases": {"gust", "i10fg"}},
@@ -36,10 +36,10 @@ TRACKED_GRIB_FIELDS = [
     {"request_key": "var_CICEP", "label": "Categorical ice pellets", "aliases": {"cicep"}},
     {"request_key": "var_CSNOW", "label": "Categorical snow", "aliases": {"csnow"}},
     {"request_key": "var_FRICV", "label": "Friction velocity", "aliases": {"fricv"}},
-    {"request_key": "var_HGT", "label": "Geopotential height", "aliases": {"hgt", "gh"}, "level_hint": "surface"},
-    {"request_key": "var_HPBL", "label": "Planetary boundary layer height", "aliases": {"hpbl"}},
+    {"request_key": "var_HGT", "label": "Geopotential height", "aliases": {"hgt", "gh", "orog"}, "level_hint": "surface"},
+    {"request_key": "var_HPBL", "label": "Planetary boundary layer height", "aliases": {"hpbl", "blh"}},
     {"request_key": "var_PRATE", "label": "Precipitation rate", "aliases": {"prate"}},
-    {"request_key": "var_SNOD", "label": "Snow depth", "aliases": {"snod", "sd"}},
+    {"request_key": "var_SNOD", "label": "Snow depth", "aliases": {"snod", "sd", "sde"}},
     {"request_key": "var_SNOWC", "label": "Snow cover", "aliases": {"snowc"}},
     {"request_key": "var_VIS", "label": "Visibility", "aliases": {"vis"}},
     {"request_key": "var_WEASD", "label": "Water equivalent of accumulated snow depth", "aliases": {"weasd", "sdwe"}},
@@ -298,6 +298,7 @@ def build_tracked_field_summary(datasets: list[tuple[xr.Dataset, dict[str, objec
                 "status": status,
                 "matches": matched_names,
                 "level_hint": field.get("level_hint", ""),
+                "expected_absence_reason": field.get("expected_absence_reason", ""),
             }
         )
 
