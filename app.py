@@ -28,21 +28,21 @@ app = Flask(__name__)
 
 TRACKED_GRIB_FIELDS = [
     {"request_key": "var_4LFTX", "label": "Best 4-layer lifted index", "aliases": {"4lftx"}, "level_hint": "pressureFromGroundLayer 18000", "expected_absence_reason": "Excluded when the request is limited to lev_surface=on."},
-    {"request_key": "var_TMP", "label": "Temperature", "aliases": {"tmp", "t"}, "level_hint": "2 m above ground"},
+    {"request_key": "var_TMP", "label": "Temperature", "aliases": {"tmp", "t", "2t"}, "level_hint": "2 m above ground"},
     {"request_key": "var_APCP", "label": "Total precipitation", "aliases": {"apcp", "tp"}},
     {"request_key": "var_GUST", "label": "Wind gust", "aliases": {"gust", "i10fg"}},
     {"request_key": "var_CAPE", "label": "Convective available potential energy", "aliases": {"cape"}},
     {"request_key": "var_CFRZR", "label": "Categorical freezing rain", "aliases": {"cfrzr"}},
     {"request_key": "var_CICEP", "label": "Categorical ice pellets", "aliases": {"cicep"}},
     {"request_key": "var_CSNOW", "label": "Categorical snow", "aliases": {"csnow"}},
-    {"request_key": "var_FRICV", "label": "Friction velocity", "aliases": {"fricv"}},
-    {"request_key": "var_HGT", "label": "Geopotential height", "aliases": {"hgt", "gh", "orog"}, "level_hint": "surface"},
-    {"request_key": "var_HPBL", "label": "Planetary boundary layer height", "aliases": {"hpbl", "blh"}},
+    {"request_key": "var_FRICV", "label": "Frictional velocity", "aliases": {"fricv"}},
+    {"request_key": "var_HGT", "label": "Surface elevation / orography", "aliases": {"hgt", "gh", "orog"}, "level_hint": "surface", "expected_absence_reason": "For surface-only HRRR subsets this request maps to the surface orography record."},
+    {"request_key": "var_HPBL", "label": "Boundary layer height", "aliases": {"hpbl", "blh"}},
     {"request_key": "var_PRATE", "label": "Precipitation rate", "aliases": {"prate"}},
     {"request_key": "var_SNOD", "label": "Snow depth", "aliases": {"snod", "sd", "sde"}},
     {"request_key": "var_SNOWC", "label": "Snow cover", "aliases": {"snowc"}},
     {"request_key": "var_VIS", "label": "Visibility", "aliases": {"vis"}},
-    {"request_key": "var_WEASD", "label": "Water equivalent of accumulated snow depth", "aliases": {"weasd", "sdwe"}},
+    {"request_key": "var_WEASD", "label": "Water equivalent of accumulated snow depth", "aliases": {"weasd", "sdwe"}, "expected_absence_reason": "This can appear in both instant and accum slices for the same GRIB file."},
     {"request_key": "lev_surface", "label": "Surface level filter", "request_only": True},
     {"request_key": "subregion", "label": "CONUS subregion crop", "request_only": True},
 ]
@@ -263,12 +263,24 @@ def normalize_field_token(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", value.lower())
 
 
+def get_variable_match_label(name: str, variable: xr.DataArray, dataset_label: str) -> str:
+    preferred_name = str(variable.attrs.get("GRIB_shortName") or variable.attrs.get("short_name") or name)
+    type_of_level = str(variable.attrs.get("GRIB_typeOfLevel") or "").strip()
+    level = str(variable.attrs.get("GRIB_level") or "").strip()
+    level_suffix = ""
+    if type_of_level and level:
+        level_suffix = f", {type_of_level} {level}"
+    elif type_of_level:
+        level_suffix = f", {type_of_level}"
+    return f"{preferred_name} ({dataset_label}{level_suffix})"
+
+
 def build_tracked_field_summary(datasets: list[tuple[xr.Dataset, dict[str, object]]]) -> list[dict[str, object]]:
     variable_lookup: dict[str, set[str]] = {}
     for dataset_index, (ds, backend_kwargs) in enumerate(datasets, start=1):
         dataset_label = backend_kwargs.get("filter_by_keys", {}).get("stepType", f"dataset-{dataset_index}")
         for name, variable in ds.data_vars.items():
-            display_name = f"{name} ({dataset_label})"
+            display_name = get_variable_match_label(name, variable, dataset_label)
             tokens = {
                 normalize_field_token(name),
                 normalize_field_token(str(variable.attrs.get("GRIB_shortName", ""))),
