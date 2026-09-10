@@ -90,16 +90,15 @@
                 <p class="meta">Dataset Inspector</p>
                 <h1 style="margin: 4px 0 0; font-size: 1.5rem;">GRIB Dataset Summary</h1>
             </div>
-            <a class="back-link" href="/?product={{ selected_product }}&date={{ selected_date }}">Back to Archive</a>
+            <a class="back-link" href="/?date={{ selected_date }}">Back to Archive</a>
         </div>
 
         <section class="hero">
             <div class="hero-copy">
-                <h1>{{ selected_product_label }} | {{ run_name|upper }} dataset preview</h1>
+                <h1>{{ run_name|upper }} dataset preview</h1>
                 <p>Showing a quick summary from the first GRIB file in this run folder so you can inspect what fields and dimensions are inside the dataset.</p>
             </div>
             <div class="stats">
-                <div class="stat"><span>Dataset</span><strong>{{ selected_product_label }}</strong></div>
                 <div class="stat"><span>Date</span><strong>{{ selected_date }}</strong></div>
                 <div class="stat"><span>Run</span><strong>{{ run_name }}</strong></div>
                 <div class="stat"><span>Files in run</span><strong>{{ file_count }}</strong></div>
@@ -114,31 +113,6 @@
         </section>
         {% elif summary %}
         <section class="panel">
-            <div class="group">
-                <div class="group-head">
-                    <h2>Tracked Request Fields</h2>
-                    <p>{{ summary.tracked_fields|length }} tracked</p>
-                </div>
-                <div class="table-note">This maps the NOMADS request keys to the variables found in the opened GRIB dataset. Request filters such as surface level and subregion are shown separately.</div>
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>Request Key</th><th>Meaning</th><th>Status</th><th>Dataset Match</th><th>Level Hint</th><th>Notes</th></tr></thead>
-                        <tbody>
-                            {% for item in summary.tracked_fields %}
-                            <tr>
-                                <td class="nowrap">{{ item.request_key }}</td>
-                                <td>{{ item.label }}</td>
-                                <td class="nowrap">{{ item.status }}</td>
-                                <td>{% if item.matches %}{{ item.matches|join(', ') }}{% else %}--{% endif %}</td>
-                                <td>{% if item.level_hint %}{{ item.level_hint }}{% else %}--{% endif %}</td>
-                                <td>{% if item.expected_absence_reason %}{{ item.expected_absence_reason }}{% else %}--{% endif %}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
             <div class="group">
                 <div class="group-head">
                     <h2>Dimensions</h2>
@@ -163,10 +137,10 @@
                 </div>
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>Dataset Slice</th><th>Name</th><th>Dims</th><th>Dtype</th></tr></thead>
+                        <thead><tr><th>Name</th><th>Dims</th><th>Dtype</th></tr></thead>
                         <tbody>
                             {% for item in summary.coordinates %}
-                            <tr><td class="nowrap">{{ item.dataset }}</td><td>{{ item.name }}</td><td>{{ item.dims|join(', ') }}</td><td>{{ item.dtype }}</td></tr>
+                            <tr><td>{{ item.name }}</td><td>{{ item.dims|join(', ') }}</td><td>{{ item.dtype }}</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -181,11 +155,10 @@
                 <div class="table-note">Attributes are trimmed to the first few metadata entries so the table stays readable.</div>
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>Dataset Slice</th><th>Name</th><th>Dims</th><th>Shape</th><th>Dtype</th><th>Attrs</th></tr></thead>
+                        <thead><tr><th>Name</th><th>Dims</th><th>Shape</th><th>Dtype</th><th>Attrs</th></tr></thead>
                         <tbody>
                             {% for item in summary.variables %}
                             <tr>
-                                <td class="nowrap">{{ item.dataset }}</td>
                                 <td class="nowrap">{{ item.name }}</td>
                                 <td class="nowrap">{{ item.dims|join(', ') }}</td>
                                 <td class="nowrap">{{ item.shape|join(' x ') }}</td>
@@ -202,19 +175,7 @@
                 <div class="group-head">
                     <h2>Dataset Attributes</h2>
                 </div>
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>Dataset Slice</th><th>Attributes</th></tr></thead>
-                        <tbody>
-                            {% for item in summary.attributes %}
-                            <tr>
-                                <td class="nowrap">{{ item.dataset }}</td>
-                                <td><pre class="code-block">{{ item.attrs }}</pre></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                <pre class="code-block">{{ summary.attributes }}</pre>
             </div>
         </section>
         {% endif %}
