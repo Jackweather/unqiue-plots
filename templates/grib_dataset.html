@@ -116,6 +116,30 @@
         <section class="panel">
             <div class="group">
                 <div class="group-head">
+                    <h2>Tracked Request Fields</h2>
+                    <p>{{ summary.tracked_fields|length }} tracked</p>
+                </div>
+                <div class="table-note">This maps the NOMADS request keys to the variables found in the opened GRIB dataset. Request filters such as surface level and subregion are shown separately.</div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Request Key</th><th>Meaning</th><th>Status</th><th>Dataset Match</th><th>Level Hint</th></tr></thead>
+                        <tbody>
+                            {% for item in summary.tracked_fields %}
+                            <tr>
+                                <td class="nowrap">{{ item.request_key }}</td>
+                                <td>{{ item.label }}</td>
+                                <td class="nowrap">{{ item.status }}</td>
+                                <td>{% if item.matches %}{{ item.matches|join(', ') }}{% else %}--{% endif %}</td>
+                                <td>{% if item.level_hint %}{{ item.level_hint }}{% else %}--{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-head">
                     <h2>Dimensions</h2>
                     <p>{{ summary.dimensions|length }} total</p>
                 </div>
