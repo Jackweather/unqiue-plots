@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+import gzip
 from io import BytesIO
 from pathlib import Path
 import subprocess
 import re
 import sys
 import threading
+import tempfile
 from zoneinfo import ZoneInfo
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -184,7 +186,7 @@ def list_raw_grib_runs(date_str: str, product_key: str) -> list[dict[str, str | 
 
     runs: list[dict[str, str | int]] = []
     for run_dir in sorted([path for path in raw_dir.iterdir() if path.is_dir()], key=lambda path: path.name, reverse=True):
-        file_count = len(list(run_dir.glob("*.grib2")))
+        file_count = len(list_grib_files(run_dir))
         runs.append(
             {
                 "name": run_dir.name,
@@ -199,11 +201,33 @@ def get_run_files(date_str: str, run_name: str, product_key: str) -> list[Path]:
     run_dir = get_raw_grib_dir(date_str, product_key) / run_name
     if not run_dir.exists() or not run_dir.is_dir():
         return []
-    return sorted(run_dir.glob("*.grib2"))
+    return list_grib_files(run_dir)
+
+
+def list_grib_files(path: Path) -> list[Path]:
+    return sorted([*path.glob("*.grib2"), *path.glob("*.grib2.gz")])
+
+
+def open_grib_dataset(grib_path: Path):
+    if grib_path.suffix != ".gz":
+        return xr.open_dataset(grib_path, engine="cfgrib", backend_kwargs={"indexpath": ""})
+
+    with gzip.open(grib_path, "rb") as compressed_stream:
+        with tempfile.NamedTemporaryFile(suffix=".grib2", delete=False) as temp_file:
+            temp_file.write(compressed_stream.read())
+            temp_path = Path(temp_file.name)
+
+    try:
+        return xr.open_dataset(temp_path, engine="cfgrib", backend_kwargs={"indexpath": ""})
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
 
 
 def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
-    with xr.open_dataset(grib_path, engine="cfgrib", backend_kwargs={"indexpath": ""}) as ds:
+    dataset = open_grib_dataset(grib_path)
+    try:
+        ds = dataset
         dataset_attrs = {key: str(value) for key, value in ds.attrs.items()}
         source_value = dataset_attrs.get("source")
         if source_value:
@@ -240,6 +264,14 @@ def summarize_grib_dataset(grib_path: Path) -> dict[str, object]:
             ],
             "attributes": dataset_attrs,
         }
+    finally:
+        ds.close()
+        if grib_path.suffix == ".gz":
+            source_value = getattr(getattr(ds, "encoding", {}), "get", None)
+            if source_value is not None:
+                temp_source = ds.encoding.get("source")
+                if temp_source:
+                    Path(temp_source).unlink(missing_ok=True)
 
 
 def get_raw_grib_dir(date_str: str, product_key: str) -> Path:
@@ -269,7 +301,7 @@ def create_raw_grib_archive(date_strs: list[str], product_key: str) -> BytesIO:
             if not raw_dir.exists():
                 continue
 
-            for grib_path in sorted(raw_dir.rglob("*.grib2")):
+            for grib_path in sorted([*raw_dir.rglob("*.grib2"), *raw_dir.rglob("*.grib2.gz")]):
                 archive_path = Path(date_str) / grib_path.relative_to(raw_dir)
                 archive.write(grib_path, arcname=str(archive_path))
 
