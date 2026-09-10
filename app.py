@@ -29,54 +29,21 @@ EASTERN_TIMEZONE = ZoneInfo("America/New_York")
 app = Flask(__name__)
 
 SURFACE_TRACKED_GRIB_FIELDS = [
-    {"request_key": "var_4LFTX", "label": "Best 4-layer lifted index", "aliases": {"4lftx"}, "level_hint": "pressureFromGroundLayer 18000", "expected_absence_reason": "Excluded when the request is limited to lev_surface=on."},
     {"request_key": "var_TMP", "label": "Temperature", "aliases": {"tmp", "t", "2t"}, "level_hint": "2 m above ground"},
-    {"request_key": "var_APCP", "label": "Total precipitation", "aliases": {"apcp", "tp"}},
-    {"request_key": "var_GUST", "label": "Wind gust", "aliases": {"gust", "i10fg"}},
-    {"request_key": "var_CAPE", "label": "Convective available potential energy", "aliases": {"cape"}},
-    {"request_key": "var_CFRZR", "label": "Categorical freezing rain", "aliases": {"cfrzr"}},
-    {"request_key": "var_CICEP", "label": "Categorical ice pellets", "aliases": {"cicep"}},
-    {"request_key": "var_CSNOW", "label": "Categorical snow", "aliases": {"csnow"}},
-    {"request_key": "var_FRICV", "label": "Frictional velocity", "aliases": {"fricv"}},
-    {"request_key": "var_HGT", "label": "Surface elevation / orography", "aliases": {"hgt", "gh", "orog"}, "level_hint": "surface", "expected_absence_reason": "For surface-only HRRR subsets this request maps to the surface orography record."},
-    {"request_key": "var_HPBL", "label": "Boundary layer height", "aliases": {"hpbl", "blh"}},
-    {"request_key": "var_PRATE", "label": "Precipitation rate", "aliases": {"prate"}},
-    {"request_key": "var_SNOD", "label": "Snow depth", "aliases": {"snod", "sd", "sde"}},
-    {"request_key": "var_SNOWC", "label": "Snow cover", "aliases": {"snowc"}},
-    {"request_key": "var_VIS", "label": "Visibility", "aliases": {"vis"}},
-    {"request_key": "var_WEASD", "label": "Water equivalent of accumulated snow depth", "aliases": {"weasd", "sdwe"}, "expected_absence_reason": "This can appear in both instant and accum slices for the same GRIB file."},
-    {"request_key": "lev_surface", "label": "Surface level filter", "request_only": True},
+    {"request_key": "lev_2_m_above_ground", "label": "2 m above ground level filter", "request_only": True},
     {"request_key": "subregion", "label": "CONUS subregion crop", "request_only": True},
-]
-
-ENTIRE_ATMOSPHERE_TRACKED_GRIB_FIELDS = [
-    {"request_key": "var_HAIL", "label": "Maximum hail size", "aliases": {"hail"}},
-    {"request_key": "var_LTNG", "label": "Lightning", "aliases": {"ltng"}},
-    {"request_key": "var_REFC", "label": "Maximum or composite radar reflectivity", "aliases": {"refc", "refd"}},
-    {"request_key": "var_RHPW", "label": "Relative humidity", "aliases": {"rhpw", "param1_242"}, "display_short_name": "rhpw", "level_hint": "entire atmosphere", "expected_absence_reason": "This field is encoded with an unknown short name in the default GRIB tables, so the inspector matches it by GRIB parameter metadata."},
-    {"request_key": "var_TCDC", "label": "Total cloud cover", "aliases": {"tcdc", "tcc"}},
-    {"request_key": "var_TCOLI", "label": "Total column integrated condensate", "aliases": {"tcoli", "param1_70"}, "display_short_name": "tcoli", "expected_absence_reason": "This field is encoded with an unknown short name in the default GRIB tables, so the inspector matches it by GRIB parameter metadata."},
-    {"request_key": "var_VIL", "label": "Vertically integrated liquid", "aliases": {"vil", "veril"}},
-    {"request_key": "lev_entire_atmosphere", "label": "Entire atmosphere level filter", "request_only": True},
 ]
 
 TRACKED_GRIB_FIELDS_BY_PRODUCT = {
     "surface_full": SURFACE_TRACKED_GRIB_FIELDS,
-    "entire_atmosphere": ENTIRE_ATMOSPHERE_TRACKED_GRIB_FIELDS,
 }
 
 PRODUCTS = {
     "surface_full": {
-        "label": "Combined Surface Dataset",
-        "short_label": "Full Surface",
+        "label": "2 m Temperature Dataset",
+        "short_label": "2 m Temperature",
         "archive_dir": "raw_grib_full_surface",
         "tracked_fields_key": "surface_full",
-    },
-    "entire_atmosphere": {
-        "label": "Entire Atmosphere Severe Weather Dataset",
-        "short_label": "Entire Atmosphere",
-        "archive_dir": "raw_grib_entire_atmosphere",
-        "tracked_fields_key": "entire_atmosphere",
     },
 }
 LEGACY_PRODUCTS = {
@@ -623,10 +590,6 @@ def run_task1():
         resolve_script_path(
             "/opt/render/project/src/hrrr_grib_full_surface_archive.py",
             "hrrr_grib_full_surface_archive.py",
-        ),
-        resolve_script_path(
-            "/opt/render/project/src/hrrr_grib_entire_atmosphere_archive.py",
-            "hrrr_grib_entire_atmosphere_archive.py",
         ),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
