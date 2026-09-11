@@ -39,8 +39,7 @@ def get_summary_log_dir() -> Path:
 
 
 def build_task_run_id(now: datetime | None = None) -> str:
-    eastern_now = (now or datetime.now(EASTERN_TIMEZONE)).astimezone(EASTERN_TIMEZONE)
-    return eastern_now.strftime("task1_%y%m%d_%I_%M_%S%p").lower()
+    return "task1"
 
 
 def format_duration(duration_seconds: float) -> str:
