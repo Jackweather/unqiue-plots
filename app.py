@@ -12,7 +12,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory
 import xarray as xr
 
-from ai_hrrr_learning import load_learning_summary, train_learning_summary
+from ai_hrrr_learning import learning_summary_is_stale, load_learning_summary, train_learning_summary
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -232,7 +232,7 @@ def index() -> str:
 def view_ai_learning() -> str:
     refresh = request.args.get("refresh") == "1"
     summary = None if refresh else load_learning_summary(DATA_DIR)
-    if summary is None:
+    if summary is None or learning_summary_is_stale(DATA_DIR, OUTPUT_DIR):
         summary = train_learning_summary(DATA_DIR, OUTPUT_DIR)
 
     return render_template("ai_learning.html", summary=summary)
