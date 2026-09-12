@@ -492,7 +492,7 @@ def main() -> None:
     output_dir = resolve_output_dir(data_dir, args.output_dir)
 
     summary = None if args.refresh else load_learning_summary(data_dir)
-    if summary is None:
+    if summary is None or learning_summary_is_stale(data_dir, output_dir):
         summary = train_learning_summary(data_dir, output_dir)
 
     print(f"Training status: {summary['status']}")
