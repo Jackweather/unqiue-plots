@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import json
@@ -10,6 +11,10 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 
+
+BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_DATA_DIR = Path("/var/data")
+LOCAL_OUTPUT_DIR = BASE_DIR / "output"
 
 RUN_DIR_PATTERN = re.compile(r"^(?P<run_hour>\d{2})z$")
 FILE_PATTERN = re.compile(r"wrfsfcf(?P<forecast_hour>\d{2})")
@@ -28,6 +33,38 @@ class TrainingSample:
     variable_name: str
     file_path: str
     target_value: float
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Train the lightweight HRRR learning summary from archived GRIB files."
+    )
+    parser.add_argument(
+        "--data-dir",
+        default=str(DEFAULT_DATA_DIR),
+        help="Directory used for cached learning output. Defaults to /var/data.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Directory containing dated raw_grib folders. Defaults to /var/data/output, or local ./output if /var/data/output does not exist.",
+    )
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Force retraining even if a cached summary exists.",
+    )
+    return parser.parse_args()
+
+
+def resolve_output_dir(data_dir: Path, requested_output_dir: str | None) -> Path:
+    if requested_output_dir:
+        return Path(requested_output_dir)
+
+    default_output_dir = data_dir / "output"
+    if default_output_dir.exists():
+        return default_output_dir
+    return LOCAL_OUTPUT_DIR
 
 
 def get_learning_cache_path(data_dir: Path) -> Path:
@@ -97,11 +134,18 @@ def build_training_samples(output_dir: Path) -> list[TrainingSample]:
     return samples
 
 
-def build_feature_matrix(samples: list[TrainingSample]) -> tuple[np.ndarray, np.ndarray, list[str]]:
+def get_feature_categories(samples: list[TrainingSample]) -> list[str]:
+    return sorted({sample.source_group for sample in samples} | {sample.variable_name for sample in samples})
+
+
+def build_feature_matrix(
+    samples: list[TrainingSample], categories: list[str] | None = None
+) -> tuple[np.ndarray, np.ndarray, list[str]]:
     if not samples:
         return np.empty((0, 0)), np.empty((0,)), []
 
-    categories = sorted({sample.source_group for sample in samples} | {sample.variable_name for sample in samples})
+    if categories is None:
+        categories = get_feature_categories(samples)
     category_index = {name: position for position, name in enumerate(categories)}
 
     rows: list[list[float]] = []
@@ -247,16 +291,17 @@ def train_learning_summary(data_dir: Path, output_dir: Path) -> dict[str, object
         }
 
     train_samples, test_samples = split_samples(samples)
-    train_x, train_y, feature_names = build_feature_matrix(train_samples)
+    categories = get_feature_categories(samples)
+    train_x, train_y, feature_names = build_feature_matrix(train_samples, categories)
     coefficients = fit_linear_model(train_x, train_y)
     train_predictions = predict(coefficients, train_x)
     train_metrics = calculate_metrics(train_y, train_predictions)
 
-    test_x, test_y, _ = build_feature_matrix(test_samples)
+    test_x, test_y, _ = build_feature_matrix(test_samples, categories)
     test_predictions = predict(coefficients, test_x)
     test_metrics = calculate_metrics(test_y, test_predictions)
 
-    all_x, all_y, _ = build_feature_matrix(samples)
+    all_x, all_y, _ = build_feature_matrix(samples, categories)
     all_predictions = predict(coefficients, all_x)
 
     summary = {
@@ -284,3 +329,28 @@ def load_learning_summary(data_dir: Path) -> dict[str, object] | None:
         return None
 
     return json.loads(cache_path.read_text(encoding="utf-8"))
+
+
+def main() -> None:
+    args = parse_args()
+    data_dir = Path(args.data_dir)
+    output_dir = resolve_output_dir(data_dir, args.output_dir)
+
+    summary = None if args.refresh else load_learning_summary(data_dir)
+    if summary is None:
+        summary = train_learning_summary(data_dir, output_dir)
+
+    print(f"Training status: {summary['status']}")
+    print(f"Output directory: {output_dir}")
+    print(f"Samples: {summary['sample_count']}")
+    print(f"Train/Test: {summary['train_count']}/{summary['test_count']}")
+    if summary["metrics"]:
+        metrics = summary["metrics"]
+        print(
+            "Holdout metrics: "
+            f"MAE={metrics['mae']:.3f}, RMSE={metrics['rmse']:.3f}, Bias={metrics['bias']:.3f}"
+        )
+
+
+if __name__ == "__main__":
+    main()
