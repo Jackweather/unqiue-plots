@@ -312,6 +312,10 @@ def run_task1():
             "/opt/render/project/src/hrrr_grib_2m_sfc_archive.py",
             "hrrr_grib_2m_sfc_archive.py",
         ),
+        resolve_script_path(
+            "/opt/render/project/src/ai_hrrr_learning.py",
+            "ai_hrrr_learning.py",
+        ),
     ]
     threading.Thread(target=lambda: run_scripts(scripts, task_run_id, 1), daemon=True).start()
     return f"Task started in background as {task_run_id}.", 200
