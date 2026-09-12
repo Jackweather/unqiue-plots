@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HRRR Learning Trends</title>
+    <style>
+        :root {
+            --page: #f3f5f7;
+            --surface: rgba(255, 255, 255, 0.94);
+            --surface-alt: #f7f9fb;
+            --line: #d7dde5;
+            --ink: #13202f;
+            --muted: #617284;
+            --accent: #0d8f6f;
+            --accent-soft: rgba(13, 143, 111, 0.12);
+            --warn: #c26b00;
+            --danger: #b42318;
+            --radius: 24px;
+            --shadow: 0 24px 60px rgba(15, 23, 42, 0.1);
+            --font-display: "Bahnschrift", "Aptos Display", "Segoe UI", sans-serif;
+            --font-body: "Aptos", "Segoe UI", sans-serif;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            color: var(--ink);
+            font-family: var(--font-body);
+            background:
+                radial-gradient(circle at top right, rgba(13, 143, 111, 0.14), transparent 28%),
+                linear-gradient(180deg, #eef3f0 0%, var(--page) 45%, #f9fbfc 100%);
+        }
+        a { color: inherit; }
+        .page { width: min(1380px, calc(100% - 28px)); margin: 0 auto; padding: 24px 0 40px; }
+        .topbar, .hero-head, .section-head, .stat-grid, .action-row { display: flex; gap: 16px; flex-wrap: wrap; }
+        .topbar, .hero-head, .section-head { justify-content: space-between; align-items: center; }
+        .nav-link, .refresh-link {
+            min-height: 44px;
+            padding: 0 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            text-decoration: none;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.86);
+            box-shadow: var(--shadow);
+            font-weight: 700;
+        }
+        .hero, .section, .empty {
+            background: var(--surface);
+            border: 1px solid rgba(215, 221, 229, 0.95);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+        .hero {
+            padding: 28px;
+            margin-top: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+        .hero::after {
+            content: "";
+            position: absolute;
+            width: 280px;
+            height: 280px;
+            right: -100px;
+            top: -100px;
+            border-radius: 999px;
+            background: radial-gradient(circle, rgba(13, 143, 111, 0.16), transparent 68%);
+        }
+        .hero-copy { max-width: 760px; position: relative; z-index: 1; }
+        .eyebrow {
+            margin: 0 0 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: var(--accent);
+            font-size: 0.8rem;
+            font-weight: 800;
+        }
+        h1, h2 { margin: 0; letter-spacing: -0.04em; }
+        h1 { font-family: var(--font-display); font-size: clamp(2.2rem, 5vw, 4.2rem); line-height: 0.95; }
+        h2 { font-size: 1.25rem; }
+        .hero-copy p, .meta, td, th { line-height: 1.55; }
+        .hero-copy p, .meta { color: var(--muted); }
+        .stat-grid { margin-top: 22px; }
+        .stat {
+            min-width: 180px;
+            flex: 1 1 180px;
+            padding: 18px;
+            border-radius: 18px;
+            background: linear-gradient(180deg, #ffffff 0%, var(--surface-alt) 100%);
+            border: 1px solid var(--line);
+        }
+        .stat span { display: block; color: var(--muted); font-size: 0.84rem; }
+        .stat strong { display: block; margin-top: 8px; font-size: 1.5rem; }
+        .layout { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 22px; margin-top: 22px; }
+        .section { padding: 24px; }
+        .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 18px; margin-top: 16px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; }
+        th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+        th { background: var(--surface-alt); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+        tr:last-child td { border-bottom: 0; }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            width: fit-content;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        .metric-good { color: var(--accent); }
+        .metric-warn { color: var(--warn); }
+        .metric-bad { color: var(--danger); }
+        .notes { display: grid; gap: 12px; margin-top: 16px; }
+        .note {
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: var(--surface-alt);
+            border: 1px solid var(--line);
+            color: var(--muted);
+        }
+        .empty { margin-top: 22px; padding: 30px; text-align: center; }
+        @media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } }
+        @media (max-width: 720px) {
+            .page { width: min(1380px, calc(100% - 16px)); padding-top: 16px; }
+            .hero, .section, .empty { border-radius: 20px; }
+            .topbar, .hero-head, .section-head, .action-row { align-items: start; flex-direction: column; }
+            .nav-link, .refresh-link { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Model Diagnostics</p>
+                <h2>HRRR Learning Dashboard</h2>
+            </div>
+            <div class="action-row">
+                <a class="nav-link" href="/">Back to Archive</a>
+                <a class="refresh-link" href="/ai-learning?refresh=1">Retrain from /var/data</a>
+            </div>
+        </header>
+
+        <section class="hero">
+            <div class="hero-head">
+                <div class="hero-copy">
+                    <p class="eyebrow">Forecast Memory</p>
+                    <h1>The model learns from date, run hour, forecast hour, and valid time.</h1>
+                    <p>This page trains a lightweight regression model against the archived GRIB files in /var/data/output and shows how its learned output changes day to day.</p>
+                </div>
+            </div>
+
+            <div class="stat-grid">
+                <div class="stat"><span>Training status</span><strong>{{ summary.status }}</strong></div>
+                <div class="stat"><span>Total samples</span><strong>{{ summary.sample_count }}</strong></div>
+                <div class="stat"><span>Train / test split</span><strong>{{ summary.train_count }} / {{ summary.test_count }}</strong></div>
+                <div class="stat"><span>Last trained UTC</span><strong>{{ summary.trained_at }}</strong></div>
+            </div>
+        </section>
+
+        {% if summary.sample_count == 0 %}
+        <section class="empty">
+            <h2>No training data found</h2>
+            <p class="meta">The dashboard looked under /var/data/output/*/raw_grib*/*/*.grib2. Once files are present there, use Retrain to build the model summary.</p>
+        </section>
+        {% else %}
+        <section class="layout">
+            <section class="section">
+                <div class="section-head">
+                    <div>
+                        <span class="pill">Validation</span>
+                        <h2>Model error summary</h2>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Slice</th>
+                                <th>MAE</th>
+                                <th>RMSE</th>
+                                <th>Bias</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Training</td>
+                                <td>{{ '%.3f'|format(summary.train_metrics.mae) }}</td>
+                                <td>{{ '%.3f'|format(summary.train_metrics.rmse) }}</td>
+                                <td>{{ '%.3f'|format(summary.train_metrics.bias) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Holdout</td>
+                                <td>{{ '%.3f'|format(summary.metrics.mae) }}</td>
+                                <td>{{ '%.3f'|format(summary.metrics.rmse) }}</td>
+                                <td>{{ '%.3f'|format(summary.metrics.bias) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="notes">
+                    <div class="note">This first version is a baseline linear model. It is intentionally simple so the app can train directly from the archived GRIB files without adding a heavyweight ML stack.</div>
+                    <div class="note">Each sample uses the file's run hour, forecast hour, valid hour, date-derived seasonality fields, and the raw archive group so the model can distinguish different feeds such as raw_grib and raw_grib_gust.</div>
+                </div>
+            </section>
+
+            <section class="section">
+                <div class="section-head">
+                    <div>
+                        <span class="pill">Features</span>
+                        <h2>What the model remembers</h2>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Feature</th></tr></thead>
+                        <tbody>
+                            {% for name in summary.feature_names %}
+                            <tr><td>{{ name }}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </section>
+
+        <section class="section" style="margin-top: 22px;">
+            <div class="section-head">
+                <div>
+                    <span class="pill">Daily trends</span>
+                    <h2>Day-to-day learned output</h2>
+                    <p class="meta">Daily averages grouped by archive source and compared against the model estimate.</p>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Archive group</th>
+                            <th>Samples</th>
+                            <th>Avg forecast hour</th>
+                            <th>Actual mean</th>
+                            <th>Predicted mean</th>
+                            <th>Mean error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trend in summary.daily_trends %}
+                        <tr>
+                            <td>{{ trend.date }}</td>
+                            <td>{{ trend.source_group }}</td>
+                            <td>{{ trend.sample_count }}</td>
+                            <td>{{ trend.avg_forecast_hour }}</td>
+                            <td>{{ trend.actual_mean }}</td>
+                            <td>{{ trend.predicted_mean }}</td>
+                            <td>{{ trend.mean_error }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="section" style="margin-top: 22px;">
+            <div class="section-head">
+                <div>
+                    <span class="pill">Recent output</span>
+                    <h2>Most recent learned samples</h2>
+                    <p class="meta">A quick look at the latest files and the model estimate for each one.</p>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Group</th>
+                            <th>Run</th>
+                            <th>Forecast</th>
+                            <th>Valid hour</th>
+                            <th>Variable</th>
+                            <th>Actual</th>
+                            <th>Predicted</th>
+                            <th>Error</th>
+                            <th>File</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in summary.recent_predictions %}
+                        <tr>
+                            <td>{{ row.date }}</td>
+                            <td>{{ row.source_group }}</td>
+                            <td>{{ '%02d'|format(row.run_hour) }}z</td>
+                            <td>f{{ '%02d'|format(row.forecast_hour) }}</td>
+                            <td>{{ row.valid_hour }}</td>
+                            <td>{{ row.variable_name }}</td>
+                            <td>{{ row.actual_value }}</td>
+                            <td>{{ row.predicted_value }}</td>
+                            <td>{{ row.error }}</td>
+                            <td>{{ row.file_name }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>
