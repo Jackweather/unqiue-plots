@@ -71,6 +71,14 @@ def get_learning_cache_path(data_dir: Path) -> Path:
     return data_dir / "ml" / "hrrr_learning_summary.json"
 
 
+def get_model_artifact_path(data_dir: Path, trained_at: datetime) -> Path:
+    return data_dir / "ml" / f"hrrr_linear_model_{trained_at.strftime('%Y%m%d')}.json"
+
+
+def get_latest_model_artifact_path(data_dir: Path) -> Path:
+    return data_dir / "ml" / "hrrr_linear_model_latest.json"
+
+
 def list_learning_files(output_dir: Path) -> list[Path]:
     if not output_dir.exists():
         return []
@@ -92,6 +100,36 @@ def parse_training_metadata(grib_path: Path) -> tuple[str, str, int, int, dateti
     run_time = datetime.strptime(date_str, "%Y%m%d").replace(tzinfo=timezone.utc) + timedelta(hours=run_hour)
     valid_time = run_time + timedelta(hours=forecast_hour)
     return date_str, source_group, run_hour, forecast_hour, valid_time
+
+
+def build_prediction_feature_row(
+    date_str: str,
+    source_group: str,
+    run_hour: int,
+    forecast_hour: int,
+    variable_name: str,
+    categories: list[str],
+) -> np.ndarray:
+    run_time = datetime.strptime(date_str, "%Y%m%d").replace(tzinfo=timezone.utc) + timedelta(hours=run_hour)
+    valid_time = run_time + timedelta(hours=forecast_hour)
+
+    row = [
+        1.0,
+        float(run_hour),
+        float(forecast_hour),
+        float(valid_time.hour),
+        float(valid_time.month),
+        float(valid_time.timetuple().tm_yday),
+        float(valid_time.weekday()),
+    ]
+    category_index = {name: position for position, name in enumerate(categories)}
+    one_hot = [0.0] * len(categories)
+    if source_group in category_index:
+        one_hot[category_index[source_group]] = 1.0
+    if variable_name in category_index:
+        one_hot[category_index[variable_name]] = 1.0
+    row.extend(one_hot)
+    return np.asarray([row], dtype=np.float64)
 
 
 def summarize_grib_target(grib_path: Path) -> tuple[str, float]:
@@ -274,6 +312,73 @@ def build_recent_predictions(samples: list[TrainingSample], predictions: np.ndar
     return rows
 
 
+def build_model_artifact(
+    samples: list[TrainingSample],
+    coefficients: np.ndarray,
+    categories: list[str],
+    feature_names: list[str],
+    trained_at: datetime,
+    output_dir: Path,
+) -> dict[str, object]:
+    variable_names = sorted({sample.variable_name for sample in samples})
+    source_groups = sorted({sample.source_group for sample in samples})
+    available_dates = sorted({sample.date_str for sample in samples})
+    return {
+        "model_type": "linear_regression_least_squares",
+        "trained_at": trained_at.isoformat(),
+        "target_name": "mean_grib_value",
+        "target_variables": variable_names,
+        "source_groups": source_groups,
+        "training_date_range": {
+            "first_date": available_dates[0],
+            "last_date": available_dates[-1],
+        },
+        "sample_count": len(samples),
+        "output_dir": str(output_dir),
+        "feature_names": feature_names,
+        "categories": categories,
+        "coefficients": [float(value) for value in coefficients.tolist()],
+    }
+
+
+def save_model_artifact(data_dir: Path, artifact: dict[str, object], trained_at: datetime) -> Path:
+    artifact_path = get_model_artifact_path(data_dir, trained_at)
+    latest_artifact_path = get_latest_model_artifact_path(data_dir)
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(artifact, indent=2)
+    artifact_path.write_text(payload, encoding="utf-8")
+    latest_artifact_path.write_text(payload, encoding="utf-8")
+    return artifact_path
+
+
+def load_model_artifact(data_dir: Path, model_path: str | None = None) -> dict[str, object]:
+    artifact_path = Path(model_path) if model_path else get_latest_model_artifact_path(data_dir)
+    if not artifact_path.exists():
+        raise FileNotFoundError(f"Model artifact not found: {artifact_path}")
+    return json.loads(artifact_path.read_text(encoding="utf-8"))
+
+
+def predict_from_model_artifact(
+    artifact: dict[str, object],
+    date_str: str,
+    source_group: str,
+    run_hour: int,
+    forecast_hour: int,
+    variable_name: str,
+) -> float:
+    categories = [str(value) for value in artifact["categories"]]
+    coefficients = np.asarray(artifact["coefficients"], dtype=np.float64)
+    feature_row = build_prediction_feature_row(
+        date_str=date_str,
+        source_group=source_group,
+        run_hour=run_hour,
+        forecast_hour=forecast_hour,
+        variable_name=variable_name,
+        categories=categories,
+    )
+    return float(predict(coefficients, feature_row)[0])
+
+
 def train_learning_summary(data_dir: Path, output_dir: Path) -> dict[str, object]:
     samples = build_training_samples(output_dir)
     if not samples:
@@ -287,9 +392,11 @@ def train_learning_summary(data_dir: Path, output_dir: Path) -> dict[str, object
             "train_metrics": {},
             "daily_trends": [],
             "recent_predictions": [],
+            "model_artifact": None,
             "status": "No GRIB files were available under /var/data/output for training.",
         }
 
+    trained_at = datetime.now(timezone.utc)
     train_samples, test_samples = split_samples(samples)
     categories = get_feature_categories(samples)
     train_x, train_y, feature_names = build_feature_matrix(train_samples, categories)
@@ -303,9 +410,18 @@ def train_learning_summary(data_dir: Path, output_dir: Path) -> dict[str, object
 
     all_x, all_y, _ = build_feature_matrix(samples, categories)
     all_predictions = predict(coefficients, all_x)
+    model_artifact = build_model_artifact(
+        samples=samples,
+        coefficients=coefficients,
+        categories=categories,
+        feature_names=feature_names,
+        trained_at=trained_at,
+        output_dir=output_dir,
+    )
+    model_artifact_path = save_model_artifact(data_dir, model_artifact, trained_at)
 
     summary = {
-        "trained_at": datetime.now(timezone.utc).isoformat(),
+        "trained_at": trained_at.isoformat(),
         "sample_count": len(samples),
         "train_count": len(train_samples),
         "test_count": len(test_samples),
@@ -314,6 +430,12 @@ def train_learning_summary(data_dir: Path, output_dir: Path) -> dict[str, object
         "train_metrics": train_metrics,
         "daily_trends": build_daily_trends(samples, all_predictions),
         "recent_predictions": build_recent_predictions(samples, all_predictions),
+        "model_artifact": {
+            "path": str(model_artifact_path),
+            "model_type": model_artifact["model_type"],
+            "target_variables": model_artifact["target_variables"],
+            "source_groups": model_artifact["source_groups"],
+        },
         "status": "trained",
     }
 
