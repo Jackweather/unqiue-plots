@@ -86,6 +86,36 @@ def list_learning_files(output_dir: Path) -> list[Path]:
     return sorted(output_dir.glob("*/raw_grib*/*/*.grib2"))
 
 
+def build_data_snapshot(output_dir: Path) -> dict[str, object]:
+    files = list_learning_files(output_dir)
+    if not files:
+        return {
+            "file_count": 0,
+            "latest_file": None,
+            "latest_mtime": None,
+        }
+
+    latest_file = max(files, key=lambda path: path.stat().st_mtime)
+    return {
+        "file_count": len(files),
+        "latest_file": str(latest_file),
+        "latest_mtime": latest_file.stat().st_mtime,
+    }
+
+
+def learning_summary_is_stale(data_dir: Path, output_dir: Path) -> bool:
+    summary = load_learning_summary(data_dir)
+    current_snapshot = build_data_snapshot(output_dir)
+    if summary is None:
+        return True
+
+    cached_snapshot = summary.get("data_snapshot")
+    if not isinstance(cached_snapshot, dict):
+        return True
+
+    return cached_snapshot != current_snapshot
+
+
 def parse_training_metadata(grib_path: Path) -> tuple[str, str, int, int, datetime]:
     date_str = grib_path.parents[2].name
     source_group = grib_path.parents[1].name
@@ -380,6 +410,7 @@ def predict_from_model_artifact(
 
 
 def train_learning_summary(data_dir: Path, output_dir: Path) -> dict[str, object]:
+    data_snapshot = build_data_snapshot(output_dir)
     samples = build_training_samples(output_dir)
     if not samples:
         return {
@@ -393,6 +424,7 @@ def train_learning_summary(data_dir: Path, output_dir: Path) -> dict[str, object
             "daily_trends": [],
             "recent_predictions": [],
             "model_artifact": None,
+            "data_snapshot": data_snapshot,
             "status": "No GRIB files were available under /var/data/output for training.",
         }
 
@@ -430,6 +462,7 @@ def train_learning_summary(data_dir: Path, output_dir: Path) -> dict[str, object
         "train_metrics": train_metrics,
         "daily_trends": build_daily_trends(samples, all_predictions),
         "recent_predictions": build_recent_predictions(samples, all_predictions),
+        "data_snapshot": data_snapshot,
         "model_artifact": {
             "path": str(model_artifact_path),
             "model_type": model_artifact["model_type"],
