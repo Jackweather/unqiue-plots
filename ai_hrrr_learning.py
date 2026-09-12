@@ -305,8 +305,11 @@ def summarize_grib_stats(grib_path: Path) -> dict[str, float | str]:
 
 
 def build_training_samples(output_dir: Path) -> list[TrainingSample]:
+    print(f"Scanning learning files in {output_dir}")
     samples: list[TrainingSample] = []
+    scanned_files = 0
     for grib_path in list_learning_files(output_dir):
+        scanned_files += 1
         try:
             date_str, source_group, run_hour, forecast_hour, valid_time = parse_training_metadata(grib_path)
             variable_name, target_value = summarize_grib_target(grib_path)
@@ -328,10 +331,12 @@ def build_training_samples(output_dir: Path) -> list[TrainingSample]:
                 target_value=target_value,
             )
         )
+    print(f"Built {len(samples)} training samples from {scanned_files} GRIB files")
     return samples
 
 
 def build_f00_anchored_samples(output_dir: Path) -> list[F00AnchoredSample]:
+    print(f"Building f00-anchored samples from {output_dir}")
     grouped_runs: dict[tuple[str, str, int], dict[int, Path]] = {}
     for grib_path in list_learning_files(output_dir):
         try:
@@ -383,6 +388,7 @@ def build_f00_anchored_samples(output_dir: Path) -> list[F00AnchoredSample]:
                 )
             )
 
+    print(f"Built {len(anchored_samples)} f00-anchored samples across {len(grouped_runs)} runs")
     return anchored_samples
 
 
@@ -728,8 +734,10 @@ def run_prediction_mode(args: argparse.Namespace, data_dir: Path) -> None:
         raise SystemExit("Predict mode requires --date YYYYMMDD and --run-hour HOUR.")
 
     if args.f00_file:
+        print(f"Loading f00 file stats from {args.f00_file}")
         f00_stats = summarize_grib_stats(Path(args.f00_file))
         variable_name = str(f00_stats["variable_name"])
+        print(f"Loading f00-anchored model from {args.model_path or get_latest_f00_model_artifact_path(data_dir)}")
         artifact = load_f00_model_artifact(data_dir, args.model_path)
         predictions: list[dict[str, object]] = []
         for forecast_hour in build_forecast_hours(args):
@@ -784,6 +792,7 @@ def run_prediction_mode(args: argparse.Namespace, data_dir: Path) -> None:
             )
         return
 
+    print(f"Loading metadata model from {args.model_path or get_latest_model_artifact_path(data_dir)}")
     artifact = load_model_artifact(data_dir, args.model_path)
     predictions: list[dict[str, object]] = []
     for forecast_hour in build_forecast_hours(args):
@@ -829,7 +838,9 @@ def run_prediction_mode(args: argparse.Namespace, data_dir: Path) -> None:
 
 
 def train_learning_summary(data_dir: Path, output_dir: Path) -> dict[str, object]:
+    print(f"Starting AI training from {output_dir}")
     data_snapshot = build_data_snapshot(output_dir)
+    print(f"Current data snapshot: {data_snapshot}")
     samples = build_training_samples(output_dir)
     f00_samples = build_f00_anchored_samples(output_dir)
     if not samples:
@@ -851,6 +862,7 @@ def train_learning_summary(data_dir: Path, output_dir: Path) -> dict[str, object
 
     trained_at = datetime.now(timezone.utc)
     train_samples, test_samples = split_samples(samples)
+    print(f"Training metadata model with {len(train_samples)} train samples and {len(test_samples)} test samples")
     categories = get_feature_categories(samples)
     train_x, train_y, feature_names = build_feature_matrix(train_samples, categories)
     coefficients = fit_linear_model(train_x, train_y)
@@ -872,6 +884,7 @@ def train_learning_summary(data_dir: Path, output_dir: Path) -> dict[str, object
         output_dir=output_dir,
     )
     model_artifact_path = save_model_artifact(data_dir, model_artifact, trained_at)
+    print(f"Saved metadata model artifact to {model_artifact_path}")
     f00_model_artifact_path: str | None = None
     f00_model_artifact_info: dict[str, object] | None = None
     if f00_samples:
@@ -884,6 +897,7 @@ def train_learning_summary(data_dir: Path, output_dir: Path) -> dict[str, object
         ]
         if not f00_train_samples:
             f00_train_samples = f00_samples
+        print(f"Training f00-anchored model with {len(f00_train_samples)} anchored samples")
         f00_x, f00_y, f00_feature_names = build_f00_feature_matrix(f00_train_samples, f00_categories)
         f00_coefficients = fit_linear_model(f00_x, f00_y)
         f00_artifact = build_f00_model_artifact(
@@ -896,6 +910,7 @@ def train_learning_summary(data_dir: Path, output_dir: Path) -> dict[str, object
         )
         f00_saved_path = save_f00_model_artifact(data_dir, f00_artifact, trained_at)
         f00_model_artifact_path = str(f00_saved_path)
+        print(f"Saved f00-anchored model artifact to {f00_model_artifact_path}")
         f00_model_artifact_info = {
             "path": f00_model_artifact_path,
             "model_type": f00_artifact["model_type"],
@@ -944,13 +959,20 @@ def main() -> None:
     data_dir = Path(args.data_dir)
     output_dir = resolve_output_dir(data_dir, args.output_dir)
 
+    print(f"AI data directory: {data_dir}")
+    print(f"AI output directory: {output_dir}")
+
     if args.predict:
+        print("Running in prediction mode")
         run_prediction_mode(args, data_dir)
         return
 
     summary = None if args.refresh else load_learning_summary(data_dir)
     if summary is None or learning_summary_is_stale(data_dir, output_dir):
+        print("Training is required: missing summary or data changed")
         summary = train_learning_summary(data_dir, output_dir)
+    else:
+        print("Using cached training summary because the data snapshot has not changed")
 
     print(f"Training status: {summary['status']}")
     print(f"Output directory: {output_dir}")
